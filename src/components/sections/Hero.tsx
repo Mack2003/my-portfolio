@@ -9,7 +9,7 @@ export default function Hero() {
         {"\n"}
         {/* Shape 1: Asterisk Sticker Top Right */}
         {"\n"}
-        <div className="absolute top-12 right-8 md:right-24 rotate-12 transition-transform hover:rotate-45">
+        <div className="hero-asterisk absolute top-12 right-8 md:right-24">
           {"\n"}
           <svg className="w-16 h-16 text-secondary" fill="currentColor" viewBox="0 0 100 100">
             {"\n"}
@@ -21,17 +21,17 @@ export default function Hero() {
         {"\n"}
         {/* Shape 2: Solid Mint Circle Cutout */}
         {"\n"}
-        <div className="absolute top-1/3 left-6 md:left-16 w-8 h-8 rounded-full bg-tertiary-fixed-dim border-2 border-surface-container-lowest shadow-[3px_3px_0px_#242940]"></div>
+        <div className="hero-confetti-dot absolute top-1/3 left-6 md:left-16 w-8 h-8 rounded-full bg-tertiary-fixed-dim border-2 border-surface-container-lowest shadow-[3px_3px_0px_#242940]"></div>
         {"\n"}
         {/* Shape 3: Geometric Diamond */}
         {"\n"}
-        <div className="absolute bottom-28 right-16 w-12 h-12 bg-primary-container border-2 border-surface-container-lowest rotate-45 shadow-[4px_4px_0px_#242940] hidden sm:block"></div>
+        <div className="hero-confetti-diamond absolute bottom-28 right-16 w-12 h-12 bg-primary-container border-2 border-surface-container-lowest hidden sm:block"></div>
         {"\n"}
         {/* Shape 4: Playful Squiggle */}
         {"\n"}
-        <svg className="absolute bottom-16 left-12 w-28 h-10 text-secondary hidden md:block" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="6" viewBox="0 0 120 40">
+        <svg className="hero-squiggle absolute bottom-16 left-12 w-28 h-10 text-secondary hidden md:block" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="6" viewBox="0 0 120 40">
           {"\n"}
-          <path d="M5 20 Q 20 5, 35 20 T 65 20 T 95 20 T 115 20"></path>
+          <path className="hero-squiggle-path" d="M5 20 Q 20 5, 35 20 T 65 20 T 95 20 T 115 20"></path>
           {"\n"}
         </svg>
         {"\n"}
@@ -55,7 +55,7 @@ export default function Hero() {
         {"\n"}
         <h1 className="font-display text-[clamp(2.75rem,8vw,7.5rem)] font-extrabold tracking-tight text-on-surface leading-[1.05] max-w-5xl">
           {"\n        Hey, I'm "}
-          <span className="relative inline-block text-primary">
+          <span className="hero-name relative inline-block text-primary">
             {"Malay!\n          "}
             {/* Hand-drawn style highlighter underline SVG */}
             {"\n"}
@@ -66,7 +66,9 @@ export default function Hero() {
             </svg>
             {"\n"}
           </span>
-          {" 👋\n      "}
+          {" "}
+          <span aria-hidden="true" className="hero-wave-hand">{"👋"}</span>
+          {"\n      "}
         </h1>
         {"\n"}
         {/* Subtitle with Swash Overlines */}

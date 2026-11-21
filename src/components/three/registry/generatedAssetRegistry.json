@@ -1,0 +1,245 @@
+[
+  {
+    "id": "delux-book-helf",
+    "displayName": "Deluxe Bookshelf",
+    "path": "/models/delux_book_helf.glb",
+    "relativePath": "delux_book_helf.glb",
+    "format": "glb",
+    "contentHash": "ab32015d8a37f9fd56b104ccdcf6d039a788605911367729705e6308ebb6c3ce",
+    "metadata": {
+      "displayName": "Deluxe Bookshelf",
+      "defaultWidth": 2.8
+    },
+    "defaultWidth": 2.8
+  },
+  {
+    "id": "desk",
+    "displayName": "Desk",
+    "path": "/models/desk.glb",
+    "relativePath": "desk.glb",
+    "format": "glb",
+    "contentHash": "766c88620c785c1e962d94be1b71c20b26ab64b5552986d6c92e770044c29aeb",
+    "metadata": {
+      "displayName": "Desk",
+      "defaultWidth": 2.5
+    },
+    "defaultWidth": 2.5
+  },
+  {
+    "id": "empty-room",
+    "displayName": "Room",
+    "path": "/models/empty_room.glb",
+    "relativePath": "empty_room.glb",
+    "format": "glb",
+    "contentHash": "65e9eba42a4f5ebdc3a4512eca87482f20c249a4bdd6fec826c635729e18a9d2",
+    "metadata": {
+      "displayName": "Room",
+      "defaultWidth": 9
+    },
+    "defaultWidth": 9
+  },
+  {
+    "id": "laptop",
+    "displayName": "Laptop",
+    "path": "/models/laptop.glb",
+    "relativePath": "laptop.glb",
+    "format": "glb",
+    "contentHash": "17a2d797354963ad9cb3e61304ec534ec6038b46113f79b1326218cf67861683",
+    "metadata": {
+      "displayName": "Laptop",
+      "defaultWidth": 1
+    },
+    "defaultWidth": 1
+  },
+  {
+    "id": "office-chair",
+    "displayName": "Office Chair",
+    "path": "/models/office_chair.glb",
+    "relativePath": "office_chair.glb",
+    "format": "glb",
+    "contentHash": "d28a51aa565c638a1e776bd5d2f4f8ec07e351f10678b9b48d594accc1a6149d",
+    "metadata": {
+      "displayName": "Office Chair",
+      "defaultWidth": 1.35
+    },
+    "defaultWidth": 1.35
+  },
+  {
+    "id": "plant",
+    "displayName": "Plant",
+    "path": "/models/plant.glb",
+    "relativePath": "plant.glb",
+    "format": "glb",
+    "contentHash": "fc0a16e556ff01fb5d1404c04051840be25a8e323245d4bd2fe224577030daff",
+    "metadata": {
+      "displayName": "Plant",
+      "defaultWidth": 0.7
+    },
+    "defaultWidth": 0.7
+  },
+  {
+    "id": "skills-icons-android-bug",
+    "displayName": "Android",
+    "path": "/models/skills-icons/android_bug.glb",
+    "relativePath": "skills-icons/android_bug.glb",
+    "format": "glb",
+    "contentHash": "9946787cee8a169c5daaac10dc406a9dbec8b3803d311764f8d8e353bb6839a7",
+    "metadata": {
+      "displayName": "Android",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-aws-logo",
+    "displayName": "AWS",
+    "path": "/models/skills-icons/aws_logo.glb",
+    "relativePath": "skills-icons/aws_logo.glb",
+    "format": "glb",
+    "contentHash": "172659445f3235d4342a65ba2af04347f5d167ea301e68ed4a178e842e16c2b9",
+    "metadata": {
+      "displayName": "AWS",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-github-kitten",
+    "displayName": "GitHub",
+    "path": "/models/skills-icons/github_kitten.glb",
+    "relativePath": "skills-icons/github_kitten.glb",
+    "format": "glb",
+    "contentHash": "a3416c580278089cd8cdfae766bd29efafbf00059d6d8103877a524b0debc6aa",
+    "metadata": {
+      "displayName": "GitHub",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-javascript-logo",
+    "displayName": "JavaScript",
+    "path": "/models/skills-icons/javascript_logo.glb",
+    "relativePath": "skills-icons/javascript_logo.glb",
+    "format": "glb",
+    "contentHash": "5a049462657d38ea8834aeec6476da4d1bdea1d454918f431e118edcfce61015",
+    "metadata": {
+      "displayName": "JavaScript",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-react-logo-circle",
+    "displayName": "React",
+    "path": "/models/skills-icons/react_logo_circle.glb",
+    "relativePath": "skills-icons/react_logo_circle.glb",
+    "format": "glb",
+    "contentHash": "9dc46aa0fe3a2c7b1bf7e0d9c55605cdbe754a6fecd2ce09f1c44bf7c242a39e",
+    "metadata": {
+      "displayName": "React",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-typescript-logo",
+    "displayName": "TypeScript",
+    "path": "/models/skills-icons/typescript_logo.glb",
+    "relativePath": "skills-icons/typescript_logo.glb",
+    "format": "glb",
+    "contentHash": "3284c66ba2705e5bd383ec69b4d08c3a4f6c30a88f958686989c2c799149b800",
+    "metadata": {
+      "displayName": "TypeScript",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-visual-studio-code",
+    "displayName": "Visual Studio Code",
+    "path": "/models/skills-icons/visual_studio_code.glb",
+    "relativePath": "skills-icons/visual_studio_code.glb",
+    "format": "glb",
+    "contentHash": "13881b2ddec27baa4a9b57aab8fd5b9f9f61d91fb0e1b70b82f99d1d622a5114",
+    "metadata": {
+      "displayName": "Visual Studio Code",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "skills-icons-vitest-3d-logo",
+    "displayName": "Vitest 3D",
+    "path": "/models/skills-icons/vitest_3d_logo.glb",
+    "relativePath": "skills-icons/vitest_3d_logo.glb",
+    "format": "glb",
+    "contentHash": "34cd4374f7e0438a308618a3d105abb7c8851e8324910837af245d08ffbfcbf0",
+    "metadata": {
+      "displayName": "Vitest 3D",
+      "defaultWidth": 0.4,
+      "tags": [
+        "skill-icon"
+      ]
+    },
+    "defaultWidth": 0.4,
+    "tags": [
+      "skill-icon"
+    ]
+  },
+  {
+    "id": "violen-with-bow",
+    "displayName": "Violin and bow",
+    "path": "/models/violen_with_bow.glb",
+    "relativePath": "violen_with_bow.glb",
+    "format": "glb",
+    "contentHash": "b3bfc5a1fb4f24971d7b404f6d190714424ca0459464abd575b1f5031470f3ca",
+    "metadata": {
+      "displayName": "Violin and bow",
+      "defaultWidth": 2.3
+    },
+    "defaultWidth": 2.3
+  }
+]

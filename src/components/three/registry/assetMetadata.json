@@ -1,0 +1,70 @@
+{
+  "delux-book-helf": {
+    "displayName": "Deluxe Bookshelf",
+    "defaultWidth": 2.8
+  },
+  "desk": {
+    "displayName": "Desk",
+    "defaultWidth": 2.5
+  },
+  "empty-room": {
+    "displayName": "Room",
+    "defaultWidth": 9
+  },
+  "laptop": {
+    "displayName": "Laptop",
+    "defaultWidth": 1
+  },
+  "office-chair": {
+    "displayName": "Office Chair",
+    "defaultWidth": 1.35
+  },
+  "plant": {
+    "displayName": "Plant",
+    "defaultWidth": 0.7
+  },
+  "skills-icons-android-bug": {
+    "displayName": "Android",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-aws-logo": {
+    "displayName": "AWS",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-github-kitten": {
+    "displayName": "GitHub",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-javascript-logo": {
+    "displayName": "JavaScript",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-react-logo-circle": {
+    "displayName": "React",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-typescript-logo": {
+    "displayName": "TypeScript",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-vitest-3d-logo": {
+    "displayName": "Vitest 3D",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "skills-icons-visual-studio-code": {
+    "displayName": "Visual Studio Code",
+    "defaultWidth": 0.4,
+    "tags": ["skill-icon"]
+  },
+  "violen-with-bow": {
+    "displayName": "Violin and bow",
+    "defaultWidth": 2.3
+  }
+}

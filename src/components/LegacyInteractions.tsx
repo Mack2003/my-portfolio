@@ -77,30 +77,11 @@ export default function LegacyInteractions() {
     };
     if (copyBtn && copyText) copyBtn.addEventListener("click", copyHandler);
 
-    // 3. Desk Camera Toggle Buttons Micro-State
-    const camButtons = document.querySelectorAll(".desk-cam-btn");
-    const camButtonHandlers: Array<[Element, EventListener]> = [];
-    if (camButtons) {
-      camButtons.forEach((btn) => {
-        const handler: EventListener = () => {
-          camButtons.forEach((button) => {
-            button.classList.remove("bg-primary-container", "text-on-primary-container", "font-bold");
-            button.classList.add("bg-surface-container", "text-on-surface");
-          });
-          btn.classList.add("bg-primary-container", "text-on-primary-container", "font-bold");
-          btn.classList.remove("bg-surface-container", "text-on-surface");
-        };
-        btn.addEventListener("click", handler);
-        camButtonHandlers.push([btn, handler]);
-      });
-    }
-
     return () => {
       menuButton?.removeEventListener("click", menuToggleHandler);
       mobileNavLinks.forEach((link) => link.removeEventListener("click", mobileNavHandler));
       stickerHandlers.forEach(([sticker, handler]) => sticker.removeEventListener("click", handler));
       if (copyBtn && copyText) copyBtn.removeEventListener("click", copyHandler);
-      camButtonHandlers.forEach(([button, handler]) => button.removeEventListener("click", handler));
       timeouts.forEach(window.clearTimeout);
     };
   }, []);

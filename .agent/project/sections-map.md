@@ -1,6 +1,6 @@
 # Sections Map
 
-Reference v1 is copied into its components. The desk, game and sound areas are static visual previews, not full implementations. The reference's main wrapper has `w-full bg-surface min-h-[calc(100vh-80px)] pt-16` and its inner div has `flex flex-col w-full text-on-surface`; this differs from the original scaffold brief and follows the supplied HTML.
+Reference v1 is copied into its components. The game and sound areas are static visual previews, not full implementations. The desk section now loads the supplied GLB assets into an interactive Three.js scene. The reference's main wrapper has `w-full bg-surface min-h-[calc(100vh-80px)] pt-16` and its inner div has `flex flex-col w-full text-on-surface`; this differs from the original scaffold brief and follows the supplied HTML.
 
 ## Outside main
 
@@ -28,7 +28,7 @@ Reference v1 is copied into its components. The desk, game and sound areas are s
 
 ### Hero
 - File: `src/components/sections/Hero.tsx`; id: none; purpose: introduction; status: copied verbatim.
-- Interactions/data: unverified role/skill copy; hero badge class quirk noted in `reference/NOTES.md`. Skills: `section-rework`, `motion-animation`, `responsive-check`. Performance: initial viewport.
+- Interactions/data: unverified role/skill copy; hero confetti elements animate independently, and the hand waves while the name or hand is hovered; animations respect reduced-motion preferences. Hero badge class quirk noted in `reference/NOTES.md`. Skills: `section-rework`, `motion-animation`, `responsive-check`. Performance: initial viewport; CSS-only motion.
 - Edit here: hero copy/layout. Changes affect the first impression and visible viewport.
 
 ### DividerHeroAbout
@@ -38,7 +38,7 @@ Reference v1 is copied into its components. The desk, game and sound areas are s
 
 ### About
 - File: `src/components/sections/About.tsx`; id: `about`; purpose: About; status: copied verbatim.
-- Interactions/data: includes remote portrait and unverified biography/claim copy. Skills: `section-rework`, `shapes-clip-path`, `responsive-check`. Performance: original remote image URL retained.
+- Interactions/data: local lossless WebP portrait in `public/images/malay-portrait.webp`; organic clipped frame morphs, and a neutral-white, soft-edged SVG UFO/spotlight appears behind the sharp portrait on hover or keyboard focus, lighting the transparent backdrop and silhouette. Biography/claim copy remains unverified. Skills: `section-rework`, `shapes-clip-path`, `motion-animation`, `responsive-check`. Performance: local 543 KB image; CSS/SVG effects respect reduced-motion preferences.
 - Edit here: About content/image/layout. Changes affect personal-content accuracy and responsive blob framing.
 
 ### DividerAboutDesk
@@ -47,9 +47,9 @@ Reference v1 is copied into its components. The desk, game and sound areas are s
 - Edit here: divider SVG. Changes affect the About/desk transition.
 
 ### DeskStage
-- File: `src/components/sections/DeskStage.tsx`; id: `desk-stage`; purpose: visual desk-stage preview; status: copied verbatim.
-- Interactions/data: camera buttons switch style; desk is CSS markup, not Three.js. Skills: `desk-scene-3d`, `motion-animation`, `responsive-check`, `performance-audit`. Performance: no 3D bundle.
-- Edit here: preview/scene boundary. Changes affect future camera, project, violin and CV interactions.
+- File: `src/components/sections/DeskStage.tsx`; id: `desk-stage`; purpose: scroll-driven interactive 3D desk scene; status: assembled from supplied GLBs.
+- Interactions/data: React Three Fiber loads registered GLBs and scroll scrubs the existing animated camera from the room through the violin and laptop to a full-screen laptop view. The registry scanner discovers GLB/GLTF/OBJ/FBX models recursively. The versioned, validated configuration holds object instances, type-specific lights, environment settings, and camera stops; runtime renderers are editor-independent. In development only, **Edit scene** provides searchable hierarchy/assets, object/light CRUD, transform gizmos and numeric controls, environment/camera inspectors, history, presets, import and export. The violin's `Bow` animates independently with reduced-motion fallback and offscreen pause. Defaults are in `src/components/three/config/defaultScene.ts`; docs are in `docs/3d-scene-editor-*.md` and `docs/3d-model-registration.md`. Preserve each GLB's embedded axis conversion; the room is rotated to face its open side toward the camera. Skills: `desk-scene-3d`, `motion-animation`, `responsive-check`, `performance-audit`. Performance: models load when the section approaches the viewport and loader caches are shared across instances.
+- Edit here: preview/scene boundary; use the development editor for placements and camera path values. Changes affect future camera, project, violin and CV interactions.
 
 ### Skills
 - File: `src/components/sections/Skills.tsx`; id: `skills`; purpose: skill stickers; status: copied verbatim.

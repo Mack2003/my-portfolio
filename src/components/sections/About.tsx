@@ -9,7 +9,12 @@ export default function About() {
         {"\n"}
         {/* Left Column: Organic blob frame portrait with sticker callouts */}
         {"\n"}
-        <div className="lg:col-span-5 flex justify-center relative">
+        <div
+          aria-label="Malay's portrait with an interactive UFO spotlight"
+          className="about-ufo-scene lg:col-span-5 flex justify-center relative"
+          role="group"
+          tabIndex={0}
+        >
           {"\n"}
           {/* Sticker 1: Creative Coder */}
           {"\n"}
@@ -29,18 +34,73 @@ export default function About() {
             {"\n          Violinist 🎻\n        "}
           </div>
           {"\n"}
-          {/* Blob Portrait Canvas Holder */}
-          {"\n"}
-          <div className="relative w-72 h-72 sm:w-88 sm:h-88 p-2 rounded-[2.5rem] bg-surface-container-high border-4 border-tertiary shadow-[8px_8px_0px_#080d22] hover:-rotate-1 transition-transform group">
-            {"\n"}
-            <div className="w-full h-full rounded-[2rem] overflow-hidden bg-surface-container-lowest border-2 border-primary-container">
-              {"\n"}
-              <img alt="Malay Ray Portrait" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2E5T3k5Dncm6XS2V0UqdIv-jKC-RqsDpLokl-HZ9EO1rg_KCWbP8C7wlGysUZZmzDLiCk6OMkvW4m-Jt-1nKUHsGTcaFuxcuhV3MwArxWJ-GGITEpiVUHoUCsVY9mr1vTJrJArmEwen2sxovDpuuvWvthGYbyfhQK1sLWPRQ0f0ys-8LneFrnhiADuUL27Zoa5bwqCqQC-pQ7PReTR-fk9bB2IXFBIPKlIQZqYR4z" />
-              {"\n"}
+          <div className="portrait-frame relative w-72 h-72 sm:w-80 sm:h-80">
+            <div aria-hidden="true" className="about-ufo">
+              <svg fill="none" viewBox="0 0 96 56">
+                <ellipse cx="48" cy="39" fill="#080d22" opacity=".45" rx="39" ry="9" />
+                <path d="M34 30c0-12 6-21 14-21s14 9 14 21" fill="#2de0a5" stroke="#080d22" strokeWidth="3" />
+                <path d="M9 34c4-8 19-13 39-13s35 5 39 13c-5 8-20 12-39 12S14 42 9 34Z" fill="#b2c5ff" stroke="#080d22" strokeWidth="4" />
+                <path d="M18 35c8-4 18-6 30-6s22 2 30 6" stroke="#fff" strokeLinecap="round" strokeWidth="3" />
+                <circle cx="31" cy="38" r="2" fill="#ffafd0" />
+                <circle cx="48" cy="40" r="2" fill="#2de0a5" />
+                <circle cx="65" cy="38" r="2" fill="#ffafd0" />
+                <path d="m75 11 2.2 4.8L82 18l-4.8 2.2L75 25l-2.2-4.8L68 18l4.8-2.2L75 11Z" fill="#ffafd0" />
+              </svg>
             </div>
-            {"\n"}
+            <div className="portrait-cutout portrait-frame-shell h-full w-full p-[3px] bg-tertiary shadow-[8px_8px_0px_#080d22]">
+              <div className="portrait-cutout relative h-full w-full overflow-hidden bg-surface-container-lowest">
+                <svg aria-hidden="true" className="portrait-spotlight absolute w-full" preserveAspectRatio="none" viewBox="0 0 320 320">
+                  <defs>
+                    <linearGradient id="portrait-beam" x1="160" x2="160" y1="36" y2="278" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#fff" stopOpacity=".76" />
+                      <stop offset=".42" stopColor="#fff" stopOpacity=".45" />
+                      <stop offset=".82" stopColor="#fff" stopOpacity=".16" />
+                      <stop offset="1" stopColor="#fff" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="portrait-beam-fade" x1="0" x2="0" y1="0" y2="1">
+                      <stop stopColor="#fff" />
+                      <stop offset=".5" stopColor="#fff" />
+                      <stop offset=".78" stopColor="#fff" stopOpacity=".55" />
+                      <stop offset="1" stopColor="#000" />
+                    </linearGradient>
+                    <mask id="portrait-beam-mask" maskContentUnits="objectBoundingBox">
+                      <path
+                        d="M.5 0L.1 .87C.3 1 .7 1 .9 .87L.5 0Z"
+                        fill="url(#portrait-beam-fade)"
+                      />
+                    </mask>
+                    <filter id="portrait-beam-soften" x="-30%" y="-20%" width="160%" height="150%">
+                      <feGaussianBlur stdDeviation="3" />
+                    </filter>
+                    <filter id="portrait-beam-glow-soften" x="-30%" y="-20%" width="160%" height="150%">
+                      <feGaussianBlur stdDeviation="12" />
+                    </filter>
+                  </defs>
+                  <path
+                    className="portrait-beam-glow"
+                    d="M158 36L16 278L304 278L162 36Z"
+                    fill="url(#portrait-beam)"
+                    filter="url(#portrait-beam-glow-soften)"
+                    mask="url(#portrait-beam-mask)"
+                  />
+                  <path
+                    className="portrait-beam-core"
+                    d="M158 36L32 278L288 278L162 36Z"
+                    fill="url(#portrait-beam)"
+                    filter="url(#portrait-beam-soften)"
+                    mask="url(#portrait-beam-mask)"
+                  />
+                </svg>
+                <img
+                  alt="Malay Ray"
+                  className="portrait-image absolute inset-0 h-full w-full object-contain"
+                  height="1020"
+                  src="/images/malay-portrait.webp"
+                  width="1095"
+                />
+              </div>
+            </div>
           </div>
-          {"\n"}
         </div>
         {"\n"}
         {/* Right Column: First-Person Narrative & Ticket Cards */}
