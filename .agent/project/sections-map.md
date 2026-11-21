@@ -1,99 +1,96 @@
 # Sections Map
 
-All components below are empty scaffold placeholders unless noted. No reference markup, section scripts, ids beyond scaffold ids, or data files have been added. Skill names are paths under `.agent/skills/`.
+Reference v1 is copied into its components. The desk, game and sound areas are static visual previews, not full implementations. The reference's main wrapper has `w-full bg-surface min-h-[calc(100vh-80px)] pt-16` and its inner div has `flex flex-col w-full text-on-surface`; this differs from the original scaffold brief and follows the supplied HTML.
 
 ## Outside main
 
 ### Header
-- File: `src/components/layout/Header.tsx`; id: none; purpose: site header; status: placeholder.
-- Interactions/data: none yet. Skills: `section-rework`. Performance: keep static unless interaction requires client code.
-- Edit here: header copy/navigation/CV link. Changes affect page shell and CV access.
+- File: `src/components/layout/Header.tsx`; id: none; purpose: site header; status: copied verbatim.
+- Interactions/data: mobile menu behavior is ported to `LegacyInteractions`; CV button is static. Skills: `reference-copy`, `section-rework`. Performance: server-rendered.
+- Edit here: header/navigation/CV markup. Changes affect page shell and mobile navigation.
 
 ### SoundToggle
-- File: `src/components/layout/SoundToggle.tsx`; id: none; purpose: sound control; status: placeholder.
-- Interactions/data: none yet. Skills: `violin-audio`, `motion-animation`. Performance: create audio only after user action.
-- Edit here: toggle UI/state. Changes affect global audio behavior.
+- File: `src/components/layout/SoundToggle.tsx`; id: none; purpose: sound control; status: copied verbatim.
+- Interactions/data: visual-only toggle; no audio behavior. Skills: `violin-audio`, `motion-animation`. Performance: no audio loaded.
+- Edit here: toggle UI. Changes affect future global audio behavior.
 
 ### FooterExtra
-- File: `src/components/layout/FooterExtra.tsx`; id: none; purpose: second footer after main; status: placeholder.
-- Interactions/data: none yet. Skills: `section-rework`, `responsive-check`. Performance: static by default.
+- File: `src/components/layout/FooterExtra.tsx`; id: none; purpose: second footer after main; status: copied verbatim.
+- Interactions/data: static links. Skills: `section-rework`, `responsive-check`. Performance: static.
 - Edit here: second-footer markup. Changes affect the intentional duplicate-footer DOM order.
 
 ## Inside main, in DOM order
 
 ### Main wrapper
-- File: `src/app/page.tsx`; id: none; purpose: compose the page and preserve DOM order; status: composed placeholders.
-- Interactions/data: imports all page components. Skills: `section-rework`, `responsive-check`.
-- Performance: owns future lazy-load boundaries. Edit here: composition/order. Changes affect landmarks and section sequencing.
+- File: `src/app/page.tsx`; id: none; purpose: preserve source classes, landmarks and order; status: copied/composed.
+- Interactions/data: composes the section components in reference order. Skills: `reference-copy`, `responsive-check`.
+- Performance: desk/game remain static preview markup; future heavy features still need lazy boundaries. Edit here: wrapper/classes/order. Changes affect every section's layout.
 
 ### Hero
-- File: `src/components/sections/Hero.tsx`; id: none; purpose: introduction; status: placeholder.
-- Interactions/data: none. Skills: `section-rework`, `motion-animation`, `responsive-check`. Performance: initial visible section; keep lightweight.
-- Edit here: hero content/layout. Changes affect first impression and the first visible viewport.
+- File: `src/components/sections/Hero.tsx`; id: none; purpose: introduction; status: copied verbatim.
+- Interactions/data: unverified role/skill copy; hero badge class quirk noted in `reference/NOTES.md`. Skills: `section-rework`, `motion-animation`, `responsive-check`. Performance: initial viewport.
+- Edit here: hero copy/layout. Changes affect the first impression and visible viewport.
 
 ### DividerHeroAbout
-- File: `src/components/dividers/DividerHeroAbout.tsx`; id: none; purpose: visual divider; status: placeholder.
-- Interactions/data: none. Skills: `shapes-clip-path`, `responsive-check`. Performance: CSS/SVG only unless justified.
-- Edit here: divider shape. Changes affect the Hero/About transition.
+- File: `src/components/dividers/DividerHeroAbout.tsx`; id: none; purpose: wavy divider; status: copied verbatim.
+- Interactions/data: SVG path copied. Skills: `shapes-clip-path`, `responsive-check`. Performance: inline SVG.
+- Edit here: divider SVG. Changes affect the Hero/About transition.
 
 ### About
-- File: `src/components/sections/About.tsx`; id: `about`; purpose: About; status: placeholder.
-- Interactions/data: no verified copy or image. Skills: `section-rework`, `shapes-clip-path`, `responsive-check`. Performance: keep static unless interaction needs otherwise.
+- File: `src/components/sections/About.tsx`; id: `about`; purpose: About; status: copied verbatim.
+- Interactions/data: includes remote portrait and unverified biography/claim copy. Skills: `section-rework`, `shapes-clip-path`, `responsive-check`. Performance: original remote image URL retained.
 - Edit here: About content/image/layout. Changes affect personal-content accuracy and responsive blob framing.
 
 ### DividerAboutDesk
-- File: `src/components/dividers/DividerAboutDesk.tsx`; id: none; purpose: transition to desk; status: placeholder.
-- Interactions/data: none. Skills: `shapes-clip-path`, `responsive-check`. Performance: CSS/SVG only unless justified.
-- Edit here: divider shape. Changes affect the About/desk transition.
+- File: `src/components/dividers/DividerAboutDesk.tsx`; id: none; purpose: wavy divider; status: copied verbatim.
+- Interactions/data: SVG path copied. Skills: `shapes-clip-path`, `responsive-check`. Performance: inline SVG.
+- Edit here: divider SVG. Changes affect the About/desk transition.
 
 ### DeskStage
-- File: `src/components/sections/DeskStage.tsx`; id: `desk-stage`; purpose: interactive desk; status: placeholder.
-- Interactions/data: none implemented. Skills: `desk-scene-3d`, `motion-animation`, `responsive-check`, `performance-audit`. Performance: lazy-load scene, reserve space, support static fallback.
-- Edit here: scene boundary and fallback. Changes affect camera scroll, sticker/project explorer, violin and CV interactions.
+- File: `src/components/sections/DeskStage.tsx`; id: `desk-stage`; purpose: visual desk-stage preview; status: copied verbatim.
+- Interactions/data: camera buttons switch style; desk is CSS markup, not Three.js. Skills: `desk-scene-3d`, `motion-animation`, `responsive-check`, `performance-audit`. Performance: no 3D bundle.
+- Edit here: preview/scene boundary. Changes affect future camera, project, violin and CV interactions.
 
 ### Skills
-- File: `src/components/sections/Skills.tsx`; id: `skills`; purpose: skills presentation; status: placeholder.
-- Interactions/data: no data yet. Skills: `section-rework`, `responsive-check`. Performance: keep static/lightweight.
-- Edit here: skill markup and future data. Changes affect skill claims and any desk sticker consistency.
+- File: `src/components/sections/Skills.tsx`; id: `skills`; purpose: skill stickers; status: copied verbatim.
+- Interactions/data: clicking sticker updates inspector banner; claims are unverified. Skills: `section-rework`, `responsive-check`. Performance: static markup plus small shared handler.
+- Edit here: sticker copy/layout. Changes affect skill claims and inspector behavior.
 
 ### ProjectExplorer
-- File: `src/components/sections/ProjectExplorer.tsx`; id: `projects`; purpose: project explorer; status: placeholder.
-- Interactions/data: no project data or windows yet. Skills: `section-rework`, `motion-animation`, `responsive-check`. Performance: lazy assets where appropriate.
-- Edit here: explorer UI/data. Changes affect project claims and desk laptop behavior.
+- File: `src/components/sections/ProjectExplorer.tsx`; id: `projects`; purpose: project card showcase; status: copied verbatim.
+- Interactions/data: four static project cards with unverified descriptions/links. Skills: `section-rework`, `motion-animation`, `responsive-check`. Performance: static.
+- Edit here: project content/cards. Changes affect project claims and links.
 
 ### ViolinCorner
-- File: `src/components/sections/ViolinCorner.tsx`; id: `violin`; purpose: violin feature/corner; status: placeholder.
-- Interactions/data: none; no verified playing ability or repertoire. Skills: `violin-audio`, `motion-animation`, `responsive-check`. Performance: fetch no audio before enabling.
-- Edit here: violin UI/behavior. Changes affect audio toggle and content-truth requirements.
+- File: `src/components/sections/ViolinCorner.tsx`; id: `violin`; purpose: violin/audio preview; status: copied verbatim.
+- Interactions/data: static tracks and learning cards, no playback; musician/streak/repertoire claims are unverified. Skills: `violin-audio`, `motion-animation`, `responsive-check`. Performance: no audio fetched.
+- Edit here: violin UI/copy. Changes affect audio controls and content truth.
 
 ### HabitCatcher
-- File: `src/components/sections/HabitCatcher.tsx`; id: `game`; purpose: Habit Catcher mini-game; status: placeholder.
-- Interactions/data: none implemented. Skills: `habit-catcher-game`, `motion-animation`, `responsive-check`, `performance-audit`. Performance: lazy-load, reserve space, start after click.
-- Edit here: game mount boundary/fallback. Changes affect game controls, assets and lifecycle.
+- File: `src/components/sections/HabitCatcher.tsx`; id: `game`; purpose: mini-game preview; status: copied verbatim.
+- Interactions/data: static game art/CTA, not a playable Phaser game. Skills: `habit-catcher-game`, `motion-animation`, `responsive-check`, `performance-audit`. Performance: Phaser not loaded.
+- Edit here: preview/game boundary. Changes affect future game controls, assets and lifecycle.
 
 ### CvBanner
-- File: `src/components/sections/CvBanner.tsx`; id: none; purpose: CV banner/download; status: placeholder.
-- Interactions/data: no CV asset yet. Skills: `section-rework`, `responsive-check`. Performance: static by default.
-- Edit here: banner and download target. Changes affect CV access and supplied-file path.
+- File: `src/components/sections/CvBanner.tsx`; id: none; purpose: CV/contact banner; status: copied verbatim.
+- Interactions/data: email copy button behavior is ported; CV button has no supplied file/behavior. Skills: `section-rework`, `responsive-check`. Performance: static.
+- Edit here: banner, contact and download target. Changes affect CV access and verified contact details.
 
 ### DividerPreFooter
-- File: `src/components/dividers/DividerPreFooter.tsx`; id: none; purpose: divider before footer; status: placeholder.
-- Interactions/data: none. Skills: `shapes-clip-path`, `responsive-check`. Performance: CSS/SVG only unless justified.
-- Edit here: divider shape. Changes affect CV/footer transition.
+- File: `src/components/dividers/DividerPreFooter.tsx`; id: none; purpose: wavy divider; status: copied verbatim.
+- Interactions/data: SVG path copied. Skills: `shapes-clip-path`, `responsive-check`. Performance: inline SVG.
+- Edit here: divider SVG. Changes affect CV/footer transition.
 
 ### Footer
-- File: `src/components/layout/Footer.tsx`; id: none; purpose: footer inside main; status: placeholder.
-- Interactions/data: none. Skills: `section-rework`, `responsive-check`. Performance: static by default.
+- File: `src/components/layout/Footer.tsx`; id: none; purpose: first footer inside main; status: copied verbatim.
+- Interactions/data: social links/copy unverified. Skills: `section-rework`, `responsive-check`. Performance: static.
 - Edit here: footer markup. Changes affect the first footer; do not merge with FooterExtra.
 
 ### LegacyInteractions
-- File: `src/components/LegacyInteractions.tsx`; id: none; purpose: future port of reference inline script; status: placeholder, client component renders null.
-- Interactions/data: no script or ids yet. Skills: `reference-copy`, `motion-animation`. Performance: keep client logic small and clean up effects.
-- Edit here: script port only. Changes affect copied reference interactions and DOM selectors.
+- File: `src/components/LegacyInteractions.tsx`; id: none; purpose: port both reference scripts; status: behavior ported.
+- Interactions/data: mobile menu, sticker inspector, clipboard toast and camera button styles. Skills: `reference-copy`, `motion-animation`. Performance: one small effect cleans listeners/timers on unmount.
+- Edit here: copied script behavior only. Changes affect selectors and reference interactions.
 
-## Additions outside current composition
+## Reserved implementations
 
-### Three.js and game implementation
-- Files: `src/components/three/`, `src/components/game/`; ids: none; purpose: reserved implementations; status: empty.
-- Skills: `desk-scene-3d`, `habit-catcher-game`, `performance-audit`. Load only through the corresponding lazy section boundary.
-- Edit here: future scene/game modules. Changes affect DeskStage/HabitCatcher integration and asset lifecycle.
+- `src/components/three/` and `src/components/game/`: empty directories. Implement scene/game only when Malay starts those reworks; use the corresponding skills and keep heavy dependencies out of the initial bundle.

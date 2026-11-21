@@ -39,12 +39,13 @@ public/game/.gitkeep — future game assets
 public/images/.gitkeep — future images
 public/models/.gitkeep — future 3D models
 public/textures/.gitkeep — future texture sheets
-reference/.gitkeep — reserved; reference files are read-only
+reference/NOTES.md — source quirks and unverified claims
+reference/stitch-page-v1.html — unchanged source HTML, do not edit
 src/app/favicon.ico — app favicon
 src/app/globals.css — Tailwind directives; later reference base CSS
-src/app/layout.tsx — root html/body layout
+src/app/layout.tsx — root html/body classes, title and Google Fonts links
 src/app/page.tsx — page composition and DOM order
-src/components/LegacyInteractions.tsx — client script port; currently renders null
+src/components/LegacyInteractions.tsx — client port of reference interaction scripts
 src/components/dividers/DividerAboutDesk.tsx — divider placeholder
 src/components/dividers/DividerHeroAbout.tsx — divider placeholder
 src/components/dividers/DividerPreFooter.tsx — divider placeholder
@@ -73,7 +74,7 @@ postcss.config.mjs — Tailwind/PostCSS plugins
 
 ## Composition and boundaries
 
-`src/app/page.tsx` renders Header, then `<main><div>` containing Hero, DividerHeroAbout, About, DividerAboutDesk, DeskStage, Skills, ProjectExplorer, ViolinCorner, HabitCatcher, CvBanner, DividerPreFooter, Footer and LegacyInteractions; SoundToggle and FooterExtra follow main. This order includes two footers intentionally.
+`src/app/page.tsx` renders Header, then `<main className="w-full bg-surface min-h-[calc(100vh-80px)] pt-16">` with an inner `<div className="flex flex-col w-full text-on-surface">` containing Hero, DividerHeroAbout, About, DividerAboutDesk, DeskStage, Skills, ProjectExplorer, ViolinCorner, HabitCatcher, CvBanner, DividerPreFooter, Footer and LegacyInteractions; SoundToggle and FooterExtra follow main. The reference wrapper classes differ from the original scaffold brief; the supplied HTML takes precedence. The order includes two footers intentionally.
 
 Current named components are server components except `LegacyInteractions.tsx`, which is a client component returning null. No dynamic-import boundaries exist yet. Keep the future 3D scene and game behind `next/dynamic` with SSR disabled; use small client components only for interactions.
 

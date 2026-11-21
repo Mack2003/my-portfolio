@@ -9,5 +9,8 @@
 
 ## Known placeholders
 
-- The reference HTML has not been copied into this workspace, so no reference claims have been verified in project files.
-- The project brief warns that reference content may invent a full name, location, years of experience, practice streak, violin repertoire, email address and project descriptions. Treat any such reference copy as placeholder.
+- `reference/stitch-page-v1.html` is a design reference, not a verified biography. Its hero and About copy contains unconfirmed role-availability, skill, experience and certification claims.
+- Its skills stickers and project cards describe unverified production experience and project details.
+- Its violin section claims musician status, a 420-day streak, completed/current studies and specific repertoire. These claims are unverified and conflict with the confirmed fact that Malay wants to learn violin.
+- It displays `malay@ray.dev`, generic social links and dates from 2025; confirm whether these are current before reworking or promoting them.
+- `reference/NOTES.md` records these items. Keep the original reference unchanged.

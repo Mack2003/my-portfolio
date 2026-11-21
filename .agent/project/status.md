@@ -1,32 +1,38 @@
 # Project Status
 
-Last updated: 2026-11-21 for creation of the agent knowledge folder.
+Last updated: 2026-11-21 for copying reference version 1 into the page.
+
+## Verification preference
+
+For every future UI change, run the app and inspect the changed page in a browser, check behavior and appearance at 390px, 820px and 1440px, fix and recheck any issues, and run build, lint and `npx tsc --noEmit`. Report any check that could not be performed.
 
 | Part | File | Status | Last change | Open notes |
 |---|---|---|---|---|
-| Header | `src/components/layout/Header.tsx` | placeholder | Scaffold | Reference copy pending |
-| Main wrapper | `src/app/page.tsx` | composed placeholders | Scaffold | Keep specified DOM order |
-| Hero | `src/components/sections/Hero.tsx` | placeholder | Scaffold | Reference copy pending |
-| Hero/About divider | `src/components/dividers/DividerHeroAbout.tsx` | placeholder | Scaffold | Reference copy pending |
-| About | `src/components/sections/About.tsx` | placeholder | Scaffold | Copy pending; personal facts unverified |
-| About/desk divider | `src/components/dividers/DividerAboutDesk.tsx` | placeholder | Scaffold | Reference copy pending |
-| Desk stage | `src/components/sections/DeskStage.tsx` | placeholder | Scaffold | Reference and supplied assets pending |
-| Skills | `src/components/sections/Skills.tsx` | placeholder | Scaffold | Skill facts need Malay confirmation |
-| Project explorer | `src/components/sections/ProjectExplorer.tsx` | placeholder | Scaffold | Project facts need Malay confirmation |
-| Violin corner | `src/components/sections/ViolinCorner.tsx` | placeholder | Scaffold | Never imply Malay plays violin |
-| Habit Catcher | `src/components/sections/HabitCatcher.tsx` | placeholder | Scaffold | Reference, sprites and game implementation pending |
-| CV banner | `src/components/sections/CvBanner.tsx` | placeholder | Scaffold | CV PDF not supplied |
-| Pre-footer divider | `src/components/dividers/DividerPreFooter.tsx` | placeholder | Scaffold | Reference copy pending |
-| Footer | `src/components/layout/Footer.tsx` | placeholder | Scaffold | Keep distinct from FooterExtra |
-| Legacy interactions | `src/components/LegacyInteractions.tsx` | placeholder (client, returns null) | Scaffold | Script not copied |
-| Sound toggle | `src/components/layout/SoundToggle.tsx` | placeholder | Scaffold | Audio not supplied |
-| Second footer | `src/components/layout/FooterExtra.tsx` | placeholder | Scaffold | Preserve DOM order |
+| Header | `src/components/layout/Header.tsx` | copied verbatim | Reference v1 | Mobile-menu behavior ported |
+| Main wrapper | `src/app/page.tsx` | composed from reference | Reference v1 | Includes source main/wrapper classes |
+| Hero | `src/components/sections/Hero.tsx` | copied verbatim | Reference v1 | `py- space-xs` quirk noted |
+| Hero/About divider | `src/components/dividers/DividerHeroAbout.tsx` | copied verbatim | Reference v1 | — |
+| About | `src/components/sections/About.tsx` | copied verbatim | Reference v1 | Personal claims unverified |
+| About/desk divider | `src/components/dividers/DividerAboutDesk.tsx` | copied verbatim | Reference v1 | — |
+| Desk stage | `src/components/sections/DeskStage.tsx` | copied verbatim | Reference v1 | Static preview; no 3D model |
+| Skills | `src/components/sections/Skills.tsx` | copied verbatim | Reference v1 | Claims unverified; inspector interaction ported |
+| Project explorer | `src/components/sections/ProjectExplorer.tsx` | copied verbatim | Reference v1 | Static cards; project claims unverified |
+| Violin corner | `src/components/sections/ViolinCorner.tsx` | copied verbatim | Reference v1 | Claims conflict with learning intent |
+| Habit Catcher | `src/components/sections/HabitCatcher.tsx` | copied verbatim | Reference v1 | Static preview; not a playable game |
+| CV banner | `src/components/sections/CvBanner.tsx` | copied verbatim | Reference v1 | CV asset not supplied; email copy ported |
+| Pre-footer divider | `src/components/dividers/DividerPreFooter.tsx` | copied verbatim | Reference v1 | — |
+| Footer | `src/components/layout/Footer.tsx` | copied verbatim | Reference v1 | Keep distinct from FooterExtra |
+| Legacy interactions | `src/components/LegacyInteractions.tsx` | behavior ported | Reference v1 | Event listeners/timers cleaned on unmount |
+| Sound toggle | `src/components/layout/SoundToggle.tsx` | copied verbatim | Reference v1 | Visual only; no audio behavior |
+| Second footer | `src/components/layout/FooterExtra.tsx` | copied verbatim | Reference v1 | Preserve DOM order |
 
 ## Open TODOs
 
-- TODO: add the supplied reference HTML to `reference/` when authorized; capture quirks in `reference/NOTES.md`.
+- Reference v1 is saved unchanged as `reference/stitch-page-v1.html`; source quirks and unverified claims are in `reference/NOTES.md`.
+- Browser comparison of copied DOM and section geometry matched the source at 390px, 820px and 1440px. Both source and app have 9px horizontal overflow at 390px and 820px; preserved in this verbatim pass.
+- A scoped Material Symbols font-size cascade adjustment in `globals.css` is needed because Next.js loads the Google Fonts stylesheets after the imported global stylesheet.
 - TODO: Malay's Phase 1–4 briefs are not present; add them verbatim when supplied.
 - TODO: Malay to supply the CV PDF, game sprites, audio, 3D model, and project screenshots.
 - TODO: confirm any biographical, skill, location, contact, experience or project facts directly with Malay.
-- TODO: extract real Tailwind tokens and exact class recipes from copied reference markup.
+- Tailwind tokens, body classes, title, Google Fonts and base CSS are copied from reference v1.
 - TODO: implement and measure the required lazy-loading boundaries and performance targets.

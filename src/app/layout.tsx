@@ -1,13 +1,22 @@
+/* eslint-disable @next/next/google-font-display */
+import type { Metadata } from "next";
 import "./globals.css";
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const metadata: Metadata = {
+  title: "Malay Ray | Creative Technologist & Software Engineer",
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html className="dark" lang="en">
+      <head>
+      <link href="https://fonts.googleapis.com" rel="preconnect" />
+      <link crossOrigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+      <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700&family=Nunito+Sans:wght@500;600;700&family=Rubik:wght@700;800&display=swap" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+      <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+      </head>
+      <body className="bg-surface font-body-md text-on-surface antialiased selection:bg-tertiary selection:text-on-tertiary min-h-screen relative">{children}</body>
     </html>
   );
 }

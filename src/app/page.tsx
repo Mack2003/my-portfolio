@@ -19,8 +19,8 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main>
-        <div>
+      <main className="w-full bg-surface min-h-[calc(100vh-80px)] pt-16">
+        <div className="flex flex-col w-full text-on-surface">
           <Hero />
           <DividerHeroAbout />
           <About />
