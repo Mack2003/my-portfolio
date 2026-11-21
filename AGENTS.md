@@ -1,3 +1,5 @@
+Read `.agent/README.md` before any task.
+
 # Malay Ray Portfolio - Reference HTML Rules
 
 Malay will give you the reference page as HTML. Your job is to copy it exactly as it is, section by section. Each section will be reworked later, so nothing may be improved now.
