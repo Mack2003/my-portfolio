@@ -10,6 +10,9 @@ The planned experience includes a 3D desk, a mini-game, violin audio, and a down
 ## Reading order
 Read this README, then all four files in `rules/`. Use the routing table to choose the task row, then read only the files named there. Never open `reference/*.html` in full; open only the marked block being compared. Never run repo-wide searches or read other sections' files before checking `project/sections-map.md`. If the map does not answer a question, search once and narrowly, then add the answer to the map in the same change.
 
+## Verification preference
+Whenever a task changes UI, run the app and open the changed page in a browser. Check the implemented behavior and appearance at 390px, 820px and 1440px, make and recheck any needed fixes, and run build, lint and TypeScript validation (`npx tsc --noEmit`). Clearly report any browser check that could not be completed.
+
 ## Task routing
 | Task | Read | Edit |
 |---|---|---|
