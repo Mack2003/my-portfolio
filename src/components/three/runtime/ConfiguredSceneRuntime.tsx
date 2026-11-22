@@ -12,10 +12,14 @@ export function ConfiguredSceneRuntime({
   configuration,
   onObjectRef,
   onNamedObjectRef,
+  activeAnimations,
+  onEmbeddedAnimationsDiscovered,
 }: {
   configuration: SceneConfiguration;
   onObjectRef: (id: string, object: Group | null) => void;
   onNamedObjectRef?: (name: string, object: Object3D | null) => void;
+  activeAnimations?: Record<string, string>;
+  onEmbeddedAnimationsDiscovered?: (id: string, clipNames: string[]) => void;
 }) {
   const scene = validateSceneConfiguration(configuration);
   if (!scene.enabled) return null;
@@ -33,6 +37,17 @@ export function ConfiguredSceneRuntime({
       {scene.objects
         .filter((instance) => instance.enabled)
         .map((instance) => {
+          if (instance.geometry) {
+            return (
+              <ConfiguredSceneObject
+                key={instance.id}
+                instance={instance}
+                onObjectRef={onObjectRef}
+                activeAnimationId={activeAnimations?.[instance.id]}
+                onEmbeddedAnimationsDiscovered={onEmbeddedAnimationsDiscovered}
+              />
+            );
+          }
           const asset = getModelAsset(instance.assetId);
           if (!asset) {
             throw new Error(
@@ -47,6 +62,8 @@ export function ConfiguredSceneRuntime({
               onObjectRef={onObjectRef}
               namedObjectNames={instance.id === "violin" ? ["Bow", "strings1"] : undefined}
               onNamedObjectRef={instance.id === "violin" ? onNamedObjectRef : undefined}
+              activeAnimationId={activeAnimations?.[instance.id]}
+              onEmbeddedAnimationsDiscovered={onEmbeddedAnimationsDiscovered}
             />
           );
         })}

@@ -108,6 +108,42 @@ export const defaultSceneConfiguration: SceneConfiguration = {
       visible: true,
       castShadow: false,
       receiveShadow: false,
+      interactions:
+        id === "violin"
+          ? {
+              enabled: true,
+              trigger: "click",
+              actions: [
+                {
+                  type: "showInformation",
+                  title: "Violin",
+                  content: "The violin is one of the interactive objects in Malay's desk.",
+                },
+              ],
+            }
+          : undefined,
+      animations:
+        id === "violin"
+          ? [
+              {
+                id: "violin-sway",
+                name: "Violin Sway",
+                type: "preset",
+                preset: "violin-sway",
+                loop: true,
+                timeScale: 1,
+              },
+              {
+                id: "violin-pulse",
+                name: "Violin Pulse",
+                type: "preset",
+                preset: "pulse",
+                loop: true,
+                timeScale: 1,
+              },
+            ]
+          : undefined,
+      defaultAnimationId: id === "violin" ? "violin-sway" : undefined,
       transform: {
         position: [...placement.position],
         rotation: [...placement.rotation],

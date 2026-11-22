@@ -102,12 +102,63 @@ function migrateAndDefaultConfiguration(value: unknown): unknown {
     ? migrated.objects.map((object) => {
         if (!isRecord(object)) return object;
         const transform = isRecord(object.transform) ? object.transform : {};
+        const geometry = isRecord(object.geometry)
+          ? {
+              type: typeof object.geometry.type === "string" ? object.geometry.type : "box",
+              parameters: isRecord(object.geometry.parameters) ? object.geometry.parameters : {},
+            }
+          : undefined;
+        const material = isRecord(object.material)
+          ? {
+              color: object.material.color ?? "#ffffff",
+              roughness: object.material.roughness ?? 0.65,
+              metalness: object.material.metalness ?? 0,
+              emissive: object.material.emissive ?? "#000000",
+              emissiveIntensity: object.material.emissiveIntensity ?? 0,
+              transparent: object.material.transparent ?? false,
+              opacity: object.material.opacity ?? 1,
+              wireframe: object.material.wireframe ?? false,
+              side: object.material.side ?? "front",
+            }
+          : undefined;
+        const glow = isRecord(object.glow)
+          ? {
+              enabled: object.glow.enabled ?? false,
+              color: object.glow.color ?? "#ffffff",
+              intensity: object.glow.intensity ?? 0,
+            }
+          : undefined;
+        const animations = Array.isArray(object.animations)
+          ? object.animations
+          : undefined;
+        const interactions = isRecord(object.interactions)
+          ? {
+              enabled: object.interactions.enabled ?? false,
+              trigger: object.interactions.trigger ?? "click",
+              actions: Array.isArray(object.interactions.actions)
+                ? object.interactions.actions
+                : [],
+            }
+          : {
+              enabled: false,
+              trigger: "click",
+              actions: [],
+            };
         return {
           ...object,
           enabled: object.enabled ?? true,
           visible: object.visible ?? true,
           castShadow: object.castShadow ?? false,
           receiveShadow: object.receiveShadow ?? false,
+          interactions,
+          ...(geometry ? { geometry } : {}),
+          ...(material ? { material } : {}),
+          ...(glow ? { glow } : {}),
+          ...(animations ? { animations } : {}),
+          defaultAnimationId:
+            typeof object.defaultAnimationId === "string"
+              ? object.defaultAnimationId
+              : undefined,
           transform: {
             ...transform,
             position: defaultVector(transform.position, [0, 0, 0]),
@@ -195,6 +246,63 @@ function validateTransform(value: unknown, issues: string[], label: string): val
   return valid;
 }
 
+function validateInteractions(value: unknown, issues: string[], label: string): boolean {
+  if (!isRecord(value)) {
+    issues.push(`${label} interactions must be an object.`);
+    return false;
+  }
+  let valid = true;
+  if (!isBoolean(value.enabled)) {
+    issues.push(`${label} interactions enabled must be a boolean.`);
+    valid = false;
+  }
+  if (value.trigger !== "click") {
+    issues.push(`${label} interaction trigger must be "click".`);
+    valid = false;
+  }
+  if (!Array.isArray(value.actions)) {
+    issues.push(`${label} interaction actions must be an array.`);
+    return false;
+  }
+  value.actions.forEach((action, index) => {
+    if (!isRecord(action) || typeof action.type !== "string") {
+      issues.push(`${label} interaction action ${index + 1} must be an object.`);
+      valid = false;
+      return;
+    }
+    switch (action.type) {
+      case "playAudio":
+        if (!isNonEmptyString(action.audio) || (action.volume !== undefined && (!isFiniteNumber(action.volume) || action.volume < 0 || action.volume > 1)) || (action.loop !== undefined && !isBoolean(action.loop))) valid = false;
+        break;
+      case "stopAudio":
+        if ((action.id !== undefined && !isNonEmptyString(action.id)) || (action.targetObjectId !== undefined && !isNonEmptyString(action.targetObjectId))) valid = false;
+        break;
+      case "playAnimation":
+        if (!isNonEmptyString(action.animation) || (action.loop !== undefined && !isBoolean(action.loop)) || (action.timeScale !== undefined && (!isFiniteNumber(action.timeScale) || action.timeScale <= 0)) || (action.duration !== undefined && (!isFiniteNumber(action.duration) || action.duration <= 0))) valid = false;
+        break;
+      case "openModal":
+        if (!isNonEmptyString(action.modal)) valid = false;
+        break;
+      case "openUrl":
+        if (!isNonEmptyString(action.url) || (action.target !== undefined && action.target !== "_self" && action.target !== "_blank")) valid = false;
+        break;
+      case "showInformation":
+        if (!isNonEmptyString(action.title) || !isNonEmptyString(action.content)) valid = false;
+        break;
+      case "focusObject":
+        if ((action.objectId !== undefined && !isNonEmptyString(action.objectId)) || (action.duration !== undefined && (!isFiniteNumber(action.duration) || action.duration <= 0))) valid = false;
+        break;
+      case "customAction":
+        if (!isNonEmptyString(action.name)) valid = false;
+        break;
+      default:
+        valid = false;
+    }
+    if (!valid) issues.push(`${label} has an invalid interaction action ${index + 1}.`);
+  });
+  return valid;
+}
+
 function validateObject(
   value: unknown,
   index: number,
@@ -207,13 +315,17 @@ function validateObject(
   }
 
   let valid = true;
-  for (const field of ["id", "assetId", "name"] as const) {
+  for (const field of ["id", "name"] as const) {
     if (!isNonEmptyString(value[field])) {
       issues.push(`${label} ${field} must be a non-empty string.`);
       valid = false;
     }
   }
-  if (isNonEmptyString(value.assetId) && !assetRegistry.some((asset) => asset.id === value.assetId)) {
+  if (!isRecord(value.geometry) && !isNonEmptyString(value.assetId)) {
+    issues.push(`${label} assetId must be a non-empty string for model objects.`);
+    valid = false;
+  }
+  if (isNonEmptyString(value.assetId) && value.assetId && !assetRegistry.some((asset) => asset.id === value.assetId)) {
     issues.push(`${label} references unknown model asset "${value.assetId}".`);
     valid = false;
   }
@@ -223,6 +335,104 @@ function validateObject(
       valid = false;
     }
   }
+  if (value.geometry !== undefined) {
+    if (!isRecord(value.geometry)) {
+      issues.push(`${label} geometry must be an object.`);
+      valid = false;
+    } else {
+      const types = new Set(["box", "sphere", "cylinder", "plane", "cone", "torus", "capsule", "circle", "ring"]);
+      if (typeof value.geometry.type !== "string" || !types.has(value.geometry.type)) {
+        issues.push(`${label} has an unsupported primitive geometry.`);
+        valid = false;
+      }
+      if (!isRecord(value.geometry.parameters) || Object.values(value.geometry.parameters).some((parameter) => !isFiniteNumber(parameter))) {
+        issues.push(`${label} primitive geometry parameters must be finite numbers.`);
+        valid = false;
+      }
+    }
+  }
+  if (value.material !== undefined) {
+    if (!isRecord(value.material)) {
+      issues.push(`${label} material must be an object.`);
+      valid = false;
+    } else {
+      if (!isColor(value.material.color) || !isColor(value.material.emissive)) {
+        issues.push(`${label} material colors must use #RRGGBB format.`);
+        valid = false;
+      }
+      if (
+        !isFiniteNumber(value.material.roughness) ||
+        value.material.roughness < 0 ||
+        value.material.roughness > 1 ||
+        !isFiniteNumber(value.material.metalness) ||
+        value.material.metalness < 0 ||
+        value.material.metalness > 1 ||
+        !isFiniteNumber(value.material.emissiveIntensity) ||
+        value.material.emissiveIntensity < 0 ||
+        !isFiniteNumber(value.material.opacity) ||
+        value.material.opacity < 0 ||
+        value.material.opacity > 1 ||
+        !isBoolean(value.material.transparent) ||
+        !isBoolean(value.material.wireframe) ||
+        !["front", "back", "double"].includes(String(value.material.side))
+      ) {
+        issues.push(`${label} material properties are invalid.`);
+        valid = false;
+      }
+    }
+  }
+  if (value.glow !== undefined) {
+    if (
+      !isRecord(value.glow) ||
+      !isBoolean(value.glow.enabled) ||
+      !isColor(value.glow.color) ||
+      !isFiniteNumber(value.glow.intensity) ||
+      value.glow.intensity < 0
+    ) {
+      issues.push(`${label} glow requires an enabled flag, #RRGGBB color, and non-negative intensity.`);
+      valid = false;
+    }
+  }
+  if (value.animations !== undefined) {
+    if (!Array.isArray(value.animations)) {
+      issues.push(`${label} animations must be an array.`);
+      valid = false;
+    } else {
+      value.animations.forEach((animation, animationIndex) => {
+        if (!isRecord(animation)) {
+          issues.push(`${label} animation ${animationIndex + 1} must be an object.`);
+          valid = false;
+          return;
+        }
+        if (
+          !isNonEmptyString(animation.id) ||
+          !isNonEmptyString(animation.name) ||
+          (animation.type !== "embedded" && animation.type !== "preset") ||
+          !isBoolean(animation.loop) ||
+          !isFiniteNumber(animation.timeScale) ||
+          animation.timeScale <= 0
+        ) {
+          issues.push(`${label} animation ${animationIndex + 1} is invalid.`);
+          valid = false;
+        }
+        if (
+          animation.type === "embedded" &&
+          !isNonEmptyString(animation.clipName)
+        ) {
+          issues.push(`${label} embedded animation ${animationIndex + 1} requires clipName.`);
+          valid = false;
+        }
+        if (
+          animation.type === "preset" &&
+          !["pulse", "bounce", "rotate", "violin-sway"].includes(String(animation.preset))
+        ) {
+          issues.push(`${label} preset animation ${animationIndex + 1} is unsupported.`);
+          valid = false;
+        }
+      });
+    }
+  }
+  if (!validateInteractions(value.interactions, issues, label)) valid = false;
   if (!validateTransform(value.transform, issues, label)) valid = false;
   return valid;
 }

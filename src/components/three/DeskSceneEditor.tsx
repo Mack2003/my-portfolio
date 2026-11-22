@@ -1,7 +1,8 @@
 "use client";
 
 import { TransformControls } from "@react-three/drei";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import type { Group } from "three";
 import {
   parseSceneConfiguration,
@@ -14,6 +15,9 @@ import type {
   SceneObjectInstance,
   SceneObjectTransform,
   SceneEnvironment,
+  SceneInteractionAction,
+  ScenePrimitiveType,
+  SceneObjectAnimation,
 } from "./config/sceneTypes";
 import { assetRegistry } from "./registry/assetRegistry";
 import type { VectorTuple, TransformMode } from "./deskSceneLayout";
@@ -102,6 +106,26 @@ function patchLight<T extends SceneLight>(light: T, patch: Partial<T>): T {
   return { ...light, ...patch };
 }
 
+function newInteractionAction(type: SceneInteractionAction["type"]): SceneInteractionAction {
+  switch (type) {
+    case "playAudio":
+      return { type, audio: "", volume: 0.8, loop: false };
+    case "stopAudio":
+      return { type };
+    case "playAnimation":
+      return { type, animation: "", loop: false, timeScale: 1, duration: 2 };
+    case "openModal":
+      return { type, modal: "scene-modal", title: "Scene information", content: "" };
+    case "openUrl":
+      return { type, url: "", target: "_blank" };
+    case "showInformation":
+      return { type, title: "Information", content: "" };
+    case "focusObject":
+      return { type, duration: 1.5 };
+    case "customAction":
+      return { type, name: "" };
+  }
+}
 export function SceneTransformGizmo({
   active,
   object,
@@ -154,6 +178,9 @@ export function DeskSceneEditor({
   onRedo,
   canUndo,
   canRedo,
+  expanded,
+  onExpandedChange,
+  embeddedAnimations,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -177,6 +204,9 @@ export function DeskSceneEditor({
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  embeddedAnimations: Record<string, string[]>;
 }) {
   const [tab, setTab] = useState<EditorTab>("objects");
   const [search, setSearch] = useState("");
@@ -192,11 +222,16 @@ export function DeskSceneEditor({
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
   const [presets, setPresets] = useState<Record<string, SceneConfiguration>>({});
+  const [actionTypeToAdd, setActionTypeToAdd] = useState<SceneInteractionAction["type"]>("showInformation");
+  const [primitiveType, setPrimitiveType] = useState<ScenePrimitiveType>("box");
+  const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
+  const dragStart = useRef<{ x: number; y: number; panelX: number; panelY: number } | null>(null);
 
   const selectedObject =
-    configuration.objects.find((object) => object.id === selected) ??
-    configuration.objects[0];
+    configuration.objects.find((object) => object.id === selected && object.id !== "room") ??
+    configuration.objects.find((object) => object.id !== "room");
   const filteredObjects = configuration.objects.filter((object) =>
+    object.id !== "room" &&
     `${object.name} ${object.assetId}`.toLowerCase().includes(search.toLowerCase()),
   );
   const filteredLights = configuration.lights.filter((light) =>
@@ -234,11 +269,130 @@ export function DeskSceneEditor({
     }
   }
 
+  function InteractionActionFields({
+    action,
+    index,
+    count,
+    onChange,
+    onMove,
+    onDuplicate,
+    onRemove,
+  }: {
+    action: SceneInteractionAction;
+    index: number;
+    count: number;
+    onChange: (action: SceneInteractionAction) => void;
+    onMove: (direction: -1 | 1) => void;
+    onDuplicate: () => void;
+    onRemove: () => void;
+  }) {
+    return (
+      <div className="rounded-lg border border-outline-variant bg-surface-container-low p-2">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="font-bold"><span className="material-symbols-outlined mr-1 align-middle text-base">ads_click</span>{action.type}</span>
+          <div className="flex gap-1">
+            <button aria-label={`Move action ${index + 1} up`} className={buttonClass} disabled={index === 0} onClick={() => onMove(-1)} type="button">Up</button>
+            <button aria-label={`Move action ${index + 1} down`} className={buttonClass} disabled={index === count - 1} onClick={() => onMove(1)} type="button">Down</button>
+            <button aria-label={`Duplicate action ${index + 1}`} className={buttonClass} onClick={onDuplicate} type="button">Duplicate</button>
+            <button aria-label={`Remove action ${index + 1}`} className={buttonClass} onClick={onRemove} type="button">Remove</button>
+          </div>
+        </div>
+        {action.type === "playAudio" && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>Audio path<input className={inputClass} value={action.audio} onChange={(event) => onChange({ ...action, audio: event.target.value })} /></label>
+            <label>Volume<input className={inputClass} max={1} min={0} step={0.05} type="range" value={action.volume ?? 0.8} onChange={(event) => onChange({ ...action, volume: Number(event.target.value) })} /></label>
+            <label className="flex items-center gap-2"><input checked={action.loop ?? false} type="checkbox" onChange={(event) => onChange({ ...action, loop: event.target.checked })} />Loop</label>
+          </div>
+        )}
+        {action.type === "stopAudio" && (
+          <label>Audio instance ID<input className={inputClass} value={action.id ?? ""} onChange={(event) => onChange({ ...action, id: event.target.value || undefined })} /></label>
+        )}
+        {action.type === "playAnimation" && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>Animation name<input className={inputClass} value={action.animation} onChange={(event) => onChange({ ...action, animation: event.target.value })} /></label>
+            <label>Speed<input className={inputClass} min={0.1} step={0.1} type="number" value={action.timeScale ?? 1} onChange={(event) => onChange({ ...action, timeScale: Number(event.target.value) })} /></label>
+            <label>Duration (seconds)<input className={inputClass} min={0.1} step={0.1} type="number" value={action.duration ?? 2} onChange={(event) => onChange({ ...action, duration: Number(event.target.value) })} /></label>
+            <label className="flex items-center gap-2"><input checked={action.loop ?? false} type="checkbox" onChange={(event) => onChange({ ...action, loop: event.target.checked })} />Loop</label>
+          </div>
+        )}
+        {action.type === "openModal" && (
+          <div className="grid gap-2">
+            <label>Modal ID<input className={inputClass} value={action.modal} onChange={(event) => onChange({ ...action, modal: event.target.value })} /></label>
+            <label>Title<input className={inputClass} value={action.title ?? ""} onChange={(event) => onChange({ ...action, title: event.target.value })} /></label>
+            <label>Content<textarea className={inputClass} value={action.content ?? ""} onChange={(event) => onChange({ ...action, content: event.target.value })} /></label>
+          </div>
+        )}
+        {action.type === "openUrl" && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>URL<input className={inputClass} value={action.url} onChange={(event) => onChange({ ...action, url: event.target.value })} /></label>
+            <label>Target<select className={inputClass} value={action.target ?? "_blank"} onChange={(event) => onChange({ ...action, target: event.target.value as "_self" | "_blank" })}><option value="_blank">New tab</option><option value="_self">Same tab</option></select></label>
+          </div>
+        )}
+        {action.type === "showInformation" && (
+          <div className="grid gap-2">
+            <label>Title<input className={inputClass} value={action.title} onChange={(event) => onChange({ ...action, title: event.target.value })} /></label>
+            <label>Content<textarea className={inputClass} value={action.content} onChange={(event) => onChange({ ...action, content: event.target.value })} /></label>
+          </div>
+        )}
+        {action.type === "focusObject" && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>Target object ID<input className={inputClass} value={action.objectId ?? ""} onChange={(event) => onChange({ ...action, objectId: event.target.value || undefined })} /></label>
+            <label>Duration (seconds)<input className={inputClass} min={0.1} step={0.1} type="number" value={action.duration ?? 1.5} onChange={(event) => onChange({ ...action, duration: Number(event.target.value) })} /></label>
+          </div>
+        )}
+        {action.type === "customAction" && (
+          <label>Controlled action name<input className={inputClass} value={action.name} onChange={(event) => onChange({ ...action, name: event.target.value })} /></label>
+        )}
+      </div>
+    );
+  }
+
   function updateObject(id: string, update: (object: SceneObjectInstance) => SceneObjectInstance) {
     onConfigurationChange((current) => ({
       ...current,
       objects: current.objects.map((object) => (object.id === id ? update(object) : object)),
     }));
+  }
+
+  function startPanelDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    dragStart.current = {
+      x: event.clientX,
+      y: event.clientY,
+      panelX: panelPosition.x,
+      panelY: panelPosition.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function movePanelDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!dragStart.current) return;
+    setPanelPosition({
+      x: dragStart.current.panelX + event.clientX - dragStart.current.x,
+      y: dragStart.current.panelY + event.clientY - dragStart.current.y,
+    });
+  }
+
+  function endPanelDrag() {
+    dragStart.current = null;
+  }
+
+  useEffect(() => {
+    if (!expanded) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onExpandedChange(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [expanded, onExpandedChange]);
+
+  function updateSelectedInteractions(
+    update: (interactions: NonNullable<SceneObjectInstance["interactions"]>) => NonNullable<SceneObjectInstance["interactions"]>,
+  ) {
+    if (!selectedObject) return;
+    updateObject(selectedObject.id, (object) => {
+      const interactions = object.interactions ?? { enabled: false, trigger: "click", actions: [] };
+      return { ...object, interactions: update(interactions) };
+    });
   }
 
   function updateLight(id: string, update: (light: SceneLight) => SceneLight) {
@@ -261,7 +415,7 @@ export function DeskSceneEditor({
     }
     const vector = copyVector(selectedObject.transform[field]);
     vector[axis] = number;
-    onPlacementChange(selected, {
+    onPlacementChange(objectId, {
       ...selectedObject.transform,
       [field]: vector,
     });
@@ -291,6 +445,7 @@ export function DeskSceneEditor({
       visible: true,
       castShadow: false,
       receiveShadow: false,
+      interactions: { enabled: false, trigger: "click", actions: [] },
       transform: {
         position: [source[0] + 0.4, source[1], source[2]],
         rotation: [0, 0, 0],
@@ -300,6 +455,59 @@ export function DeskSceneEditor({
     onConfigurationChange((current) => ({ ...current, objects: [...current.objects, object] }));
     onSelectedChange(object.id);
     setMessage(`Added ${asset.displayName}.`);
+  }
+
+  function addPrimitive() {
+    const parametersByType: Record<ScenePrimitiveType, Record<string, number>> = {
+      box: { width: 1, height: 1, depth: 1 },
+      sphere: { radius: 0.5, widthSegments: 32, heightSegments: 16 },
+      cylinder: { radiusTop: 0.5, radiusBottom: 0.5, height: 1, radialSegments: 32 },
+      plane: { width: 1, height: 1 },
+      cone: { radius: 0.5, height: 1, radialSegments: 32 },
+      torus: { radius: 0.5, tube: 0.15, radialSegments: 16, tubularSegments: 48 },
+      capsule: { radius: 0.35, length: 0.8, capSegments: 8, radialSegments: 16 },
+      circle: { radius: 0.5, segments: 32 },
+      ring: { innerRadius: 0.25, outerRadius: 0.5, thetaSegments: 32 },
+    };
+    const source = selectedObject?.transform.position ?? [0, 0, 0];
+    const object: SceneObjectInstance = {
+      id: uniqueId(`primitive-${primitiveType}`),
+      assetId: "",
+      name: `New ${primitiveType}`,
+      enabled: true,
+      visible: true,
+      castShadow: false,
+      receiveShadow: false,
+      transform: {
+        position: [source[0] + 0.4, source[1], source[2]],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+      },
+      geometry: {
+        type: primitiveType,
+        parameters: parametersByType[primitiveType],
+      },
+      material: {
+        color: "#ffffff",
+        roughness: 0.65,
+        metalness: 0,
+        emissive: "#000000",
+        emissiveIntensity: 0,
+        transparent: false,
+        opacity: 1,
+        wireframe: false,
+        side: "front",
+      },
+      glow: {
+        enabled: false,
+        color: "#ffffff",
+        intensity: 0,
+      },
+      interactions: { enabled: false, trigger: "click", actions: [] },
+    };
+    onConfigurationChange((current) => ({ ...current, objects: [...current.objects, object] }));
+    onSelectedChange(object.id);
+    setMessage(`Added ${primitiveType} primitive.`);
   }
 
   function duplicateObject() {
@@ -327,7 +535,9 @@ export function DeskSceneEditor({
 
   function deleteObject() {
     if (!selectedObject) return;
-    const remaining = configuration.objects.filter((object) => object.id !== selectedObject.id);
+    const remaining = configuration.objects.filter(
+      (object) => object.id !== "room" && object.id !== selectedObject.id,
+    );
     onConfigurationChange((current) => ({
       ...current,
       objects: current.objects.filter((object) => object.id !== selectedObject.id),
@@ -394,7 +604,7 @@ export function DeskSceneEditor({
     try {
       const imported = parseSceneConfiguration(source);
       onConfigurationChange(() => imported);
-      onSelectedChange(imported.objects[0]?.id ?? "");
+      onSelectedChange(imported.objects.find((object) => object.id !== "room")?.id ?? "");
       setImportText("");
       setMessage("Scene configuration imported and validated.");
     } catch (error) {
@@ -441,7 +651,7 @@ export function DeskSceneEditor({
       return;
     }
     onConfigurationChange(() => structuredClone(preset));
-    onSelectedChange(preset.objects[0]?.id ?? "");
+    onSelectedChange(preset.objects.find((object) => object.id !== "room")?.id ?? "");
     setMessage(`Loaded preset "${selectedPreset}".`);
   }
 
@@ -469,20 +679,58 @@ export function DeskSceneEditor({
     { id: "configuration", label: "Config" },
   ];
 
-  return (
-    <div className="absolute bottom-3 right-3 z-30 w-[min(31rem,calc(100%-1.5rem))] font-label-code-sm text-label-code-sm text-on-surface sm:bottom-5 sm:right-5">
-      <button
-        aria-expanded={open}
-        className={`ml-auto block ${buttonClass} shadow-[2px_2px_0px_#080d22]`}
-        onClick={() => onOpenChange(!open)}
-        type="button"
-      >
-        {open ? "Close scene editor" : "Edit scene"}
-      </button>
+  const editor = (
+    <div className={`${expanded ? "fixed inset-0 z-[80] pointer-events-none" : "fixed bottom-4 right-4 z-[80] pointer-events-none"} font-label-code-sm text-label-code-sm text-on-surface`}>
+      <div className="pointer-events-auto ml-auto flex w-fit gap-1 pr-0">
+        {open && expanded && (
+          <button
+            aria-label="Exit full-screen editor"
+            className={`${buttonClass} flex h-10 w-10 items-center justify-center shadow-[2px_2px_0px_#080d22]`}
+            onClick={() => onExpandedChange(false)}
+            title="Exit full screen"
+            type="button"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+          </button>
+        )}
+        {open && (
+          <button
+            aria-label={expanded ? "Exit full-screen scene" : "Open full-screen scene"}
+            className={`${buttonClass} flex h-10 items-center gap-2 shadow-[2px_2px_0px_#080d22]`}
+            onClick={() => onExpandedChange(!expanded)}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-lg" aria-hidden="true">
+              {expanded ? "close_fullscreen" : "open_in_full"}
+            </span>
+            {expanded ? "Exit full screen" : "Full screen"}
+          </button>
+        )}
+        <button
+          aria-expanded={open}
+          className={`${buttonClass} flex h-10 items-center gap-2 shadow-[2px_2px_0px_#080d22]`}
+          onClick={() => onOpenChange(!open)}
+          type="button"
+        >
+          <span className="material-symbols-outlined text-lg" aria-hidden="true">
+            {open ? "close" : "tune"}
+          </span>
+          {open ? "Close scene editor" : "Edit scene"}
+        </button>
+      </div>
 
       {open && (
-        <div className={`mt-2 max-h-[76vh] overflow-auto ${panelClass}`}>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-3">
+        <div
+          className={`pointer-events-auto mt-2 overflow-y-auto ${expanded ? "fixed right-5 top-16 max-h-[calc(100vh-5rem)] w-[min(38rem,calc(100%-2.5rem))]" : "fixed bottom-16 right-4 max-h-[calc(100vh-6rem)] w-[min(38rem,calc(100%-2rem))]"} ${panelClass}`}
+          style={{ transform: `translate(${panelPosition.x}px, ${panelPosition.y}px)` }}
+        >
+          <div
+            className="mb-3 flex cursor-move touch-none flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-3"
+            onPointerDown={startPanelDrag}
+            onPointerMove={movePanelDrag}
+            onPointerUp={endPanelDrag}
+            onPointerCancel={endPanelDrag}
+          >
             <label className="flex items-center gap-2 font-bold">
               <input
                 checked={configuration.enabled}
@@ -553,6 +801,26 @@ export function DeskSceneEditor({
                 placeholder="Search objects"
                 value={search}
               />
+              <label className="mb-2 block">
+                <span className="mb-1 flex items-center gap-2 font-bold">
+                  <span className="material-symbols-outlined text-lg" aria-hidden="true">view_in_ar</span>
+                  Selected object
+                </span>
+                <select
+                  aria-label="Selected scene object"
+                  className={inputClass}
+                  onChange={(event) => onSelectedChange(event.target.value)}
+                  value={selectedObject?.id ?? ""}
+                >
+                  {configuration.objects
+                    .filter((object) => object.id !== "room")
+                    .map((object) => (
+                      <option key={object.id} value={object.id}>
+                        {object.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
               <ul className="mb-3 max-h-32 space-y-1 overflow-auto">
                 {filteredObjects.map((object) => (
                   <li className="flex items-center gap-2" key={object.id}>
@@ -618,6 +886,32 @@ export function DeskSceneEditor({
                 </select>
                 <button className={buttonClass} onClick={addObject} type="button">
                   Add object
+                </button>
+              </div>
+
+              <div className="mb-3 grid grid-cols-[1fr_auto] gap-2">
+                <label>
+                  <span className="mb-1 block">Standard primitive</span>
+                  <select
+                    aria-label="Primitive geometry"
+                    className={inputClass}
+                    onChange={(event) => setPrimitiveType(event.target.value as ScenePrimitiveType)}
+                    value={primitiveType}
+                  >
+                    <option value="box">Box</option>
+                    <option value="sphere">Sphere</option>
+                    <option value="cylinder">Cylinder</option>
+                    <option value="plane">Plane</option>
+                    <option value="cone">Cone</option>
+                    <option value="torus">Torus</option>
+                    <option value="capsule">Capsule</option>
+                    <option value="circle">Circle</option>
+                    <option value="ring">Ring</option>
+                  </select>
+                </label>
+                <button className={`${buttonClass} self-end`} onClick={addPrimitive} type="button">
+                  <span className="material-symbols-outlined mr-1 align-middle text-lg" aria-hidden="true">deployed_code</span>
+                  Add primitive
                 </button>
               </div>
 
@@ -746,6 +1040,400 @@ export function DeskSceneEditor({
                       })
                     }
                   />
+                  <details className="mt-3 rounded-lg border-2 border-surface-variant bg-surface-container-lowest p-3" open>
+                      <summary className="cursor-pointer select-none font-bold">
+                        <span className="material-symbols-outlined mr-2 align-middle text-lg" aria-hidden="true">animation</span>
+                        Animations
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        <label className="flex items-center justify-between gap-2">
+                          <span>Default animation</span>
+                          <select
+                            className={inputClass}
+                            value={selectedObject.defaultAnimationId ?? ""}
+                            onChange={(event) =>
+                              updateObject(selectedObject.id, (object) => {
+                                const value = event.target.value;
+                                if (value.startsWith("embedded:")) {
+                                  const clipName = value.slice("embedded:".length);
+                                  const existing = object.animations?.find(
+                                    (animation) =>
+                                      animation.type === "embedded" &&
+                                      animation.clipName === clipName,
+                                  );
+                                  const id = existing?.id ?? `embedded-${uniqueId("clip")}`;
+                                  return {
+                                    ...object,
+                                    animations: existing
+                                      ? object.animations
+                                      : [
+                                          ...(object.animations ?? []),
+                                          {
+                                            id,
+                                            name: clipName,
+                                            type: "embedded",
+                                            clipName,
+                                            loop: true,
+                                            timeScale: 1,
+                                          },
+                                        ],
+                                    defaultAnimationId: id,
+                                  };
+                                }
+                                return {
+                                  ...object,
+                                  defaultAnimationId: value || undefined,
+                                };
+                              })
+                            }
+                          >
+                            <option value="">None</option>
+                            {(selectedObject.animations ?? []).map((animation) => (
+                              <option key={animation.id} value={animation.id}>
+                                {animation.name}
+                              </option>
+                            ))}
+                            {(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => (
+                              <option key={`embedded-${clipName}`} value={`embedded:${clipName}`}>
+                                Embedded: {clipName}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className={buttonClass}
+                            onClick={() =>
+                              updateObject(selectedObject.id, (object) => {
+                                const id = uniqueId("preset-animation");
+                                const animation: SceneObjectAnimation = {
+                                  id,
+                                  name: "Pulse",
+                                  type: "preset",
+                                  preset: "pulse",
+                                  loop: true,
+                                  timeScale: 1,
+                                };
+                                return {
+                                  ...object,
+                                  animations: [...(object.animations ?? []), animation],
+                                  defaultAnimationId: object.defaultAnimationId ?? id,
+                                };
+                              })
+                            }
+                            type="button"
+                          >
+                            <span className="material-symbols-outlined mr-1 align-middle text-lg" aria-hidden="true">add_circle</span>
+                            Add preset
+                          </button>
+                          {(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => (
+                            <button
+                              className={buttonClass}
+                              key={`add-${clipName}`}
+                              onClick={() =>
+                                updateObject(selectedObject.id, (object) => {
+                                  const id = `embedded-${uniqueId("clip")}`;
+                                  const animation: SceneObjectAnimation = {
+                                    id,
+                                    name: clipName,
+                                    type: "embedded",
+                                    clipName,
+                                    loop: true,
+                                    timeScale: 1,
+                                  };
+                                  return {
+                                    ...object,
+                                    animations: [...(object.animations ?? []), animation],
+                                    defaultAnimationId: object.defaultAnimationId ?? id,
+                                  };
+                                })
+                              }
+                              type="button"
+                            >
+                              Add {clipName}
+                            </button>
+                          ))}
+                        </div>
+                        {(selectedObject.animations ?? []).map((animation, index) => (
+                          <div className="grid gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2" key={animation.id}>
+                            <div className="grid grid-cols-2 gap-2">
+                              <label>Name<input className={inputClass} value={animation.name} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) }))} /></label>
+                              <label>Type<select className={inputClass} value={animation.type} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, type: event.target.value as "embedded" | "preset", preset: event.target.value === "preset" ? "pulse" : undefined, clipName: event.target.value === "embedded" ? (item.clipName ?? "") : undefined } : item) }))}><option value="preset">Custom preset</option><option value="embedded">Embedded clip</option></select></label>
+                            </div>
+                            {animation.type === "preset" ? (
+                              <label>Preset<select className={inputClass} value={animation.preset ?? "pulse"} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, preset: event.target.value as "pulse" | "bounce" | "rotate" | "violin-sway" } : item) }))}><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="rotate">Rotate</option><option value="violin-sway">Violin sway</option></select></label>
+                            ) : (
+                              <label>Embedded clip<select className={inputClass} value={animation.clipName ?? ""} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, clipName: event.target.value } : item) }))}><option value="">Choose clip</option>{(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => <option key={clipName} value={clipName}>{clipName}</option>)}</select></label>
+                            )}
+                            <div className="grid grid-cols-2 gap-2">
+                              <label>Speed<input className={inputClass} min={0.1} step={0.1} type="number" value={animation.timeScale} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, timeScale: Number(event.target.value) } : item) }))} /></label>
+                              <label className="flex items-center gap-2"><input checked={animation.loop} type="checkbox" onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, loop: event.target.checked } : item) }))} />Loop</label>
+                            </div>
+                            <button className={buttonClass} onClick={() => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).filter((_, itemIndex) => itemIndex !== index), defaultAnimationId: object.defaultAnimationId === animation.id ? undefined : object.defaultAnimationId }))} type="button">Remove animation</button>
+                          </div>
+                        ))}
+                        {(selectedObject.animations ?? []).length === 0 && (
+                          <p className="rounded-md border border-dashed border-outline-variant p-3 text-on-surface-variant">No animations configured.</p>
+                        )}
+                      </div>
+                    </details>
+                    {selectedObject.geometry && (
+                    <details className="mt-3 rounded-lg border-2 border-surface-variant bg-surface-container-lowest p-3" open>
+                      <summary className="cursor-pointer select-none font-bold">
+                        <span className="material-symbols-outlined mr-2 align-middle text-lg" aria-hidden="true">deployed_code</span>
+                        Geometry
+                      </summary>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {Object.entries(selectedObject.geometry.parameters).map(([parameter, value]) => (
+                          <label key={parameter}>
+                            <span className="mb-1 block capitalize">{parameter}</span>
+                            <input
+                              className={inputClass}
+                              min={parameter.toLowerCase().includes("segments") ? 3 : undefined}
+                              step={parameter.toLowerCase().includes("segments") ? 1 : 0.05}
+                              type="number"
+                              value={value}
+                              onChange={(event) =>
+                                updateObject(selectedObject.id, (object) => ({
+                                  ...object,
+                                  geometry: object.geometry
+                                    ? {
+                                        ...object.geometry,
+                                        parameters: {
+                                          ...object.geometry.parameters,
+                                          [parameter]: Number(event.target.value),
+                                        },
+                                      }
+                                    : undefined,
+                                }))
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  <details className="mt-3 rounded-lg border-2 border-surface-variant bg-surface-container-lowest p-3" open>
+                    <summary className="cursor-pointer select-none font-bold">
+                      <span className="material-symbols-outlined mr-2 align-middle text-lg" aria-hidden="true">palette</span>
+                      Material and light
+                    </summary>
+                    {selectedObject.material ? (
+                      <div className="mt-3 grid gap-3">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          <label>Base color<input className={inputClass} type="color" value={selectedObject.material.color} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, color: event.target.value } : undefined }))} /></label>
+                          <label>Emissive<input className={inputClass} type="color" value={selectedObject.material.emissive} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, emissive: event.target.value } : undefined }))} /></label>
+                          <label>Side<select className={inputClass} value={selectedObject.material.side} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, side: event.target.value as "front" | "back" | "double" } : undefined }))}><option value="front">Front</option><option value="back">Back</option><option value="double">Double</option></select></label>
+                        </div>
+                        <label>Roughness<input className={inputClass} max={1} min={0} step={0.05} type="range" value={selectedObject.material.roughness} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, roughness: Number(event.target.value) } : undefined }))} /></label>
+                        <label>Metalness<input className={inputClass} max={1} min={0} step={0.05} type="range" value={selectedObject.material.metalness} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, metalness: Number(event.target.value) } : undefined }))} /></label>
+                        <label>Emissive intensity<input className={inputClass} min={0} step={0.1} type="number" value={selectedObject.material.emissiveIntensity} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, emissiveIntensity: Number(event.target.value) } : undefined }))} /></label>
+                        <label>Opacity<input className={inputClass} max={1} min={0} step={0.05} type="range" value={selectedObject.material.opacity} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, opacity: Number(event.target.value), transparent: Number(event.target.value) < 1 } : undefined }))} /></label>
+                        <div className="flex flex-wrap gap-4">
+                          <label className="flex items-center gap-2"><input checked={selectedObject.material.transparent} type="checkbox" onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, transparent: event.target.checked } : undefined }))} />Transparent</label>
+                          <label className="flex items-center gap-2"><input checked={selectedObject.material.wireframe} type="checkbox" onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, wireframe: event.target.checked } : undefined }))} />Wireframe</label>
+                        </div>
+                        <div className="border-t border-outline-variant pt-3">
+                          <label className="flex items-center gap-2">
+                            <input
+                              checked={selectedObject.glow?.enabled ?? false}
+                              type="checkbox"
+                              onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: { enabled: event.target.checked, color: object.glow?.color ?? "#ffffff", intensity: object.glow?.intensity ?? 1 } }))}
+                            />
+                            Emit light
+                          </label>
+                          {selectedObject.glow?.enabled && (
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <label>Glow color<input className={inputClass} type="color" value={selectedObject.glow.color} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: object.glow ? { ...object.glow, color: event.target.value } : undefined }))} /></label>
+                              <label>Light intensity<input className={inputClass} min={0} step={0.1} type="number" value={selectedObject.glow.intensity} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: object.glow ? { ...object.glow, intensity: Number(event.target.value) } : undefined }))} /></label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        className={`${buttonClass} mt-3`}
+                        onClick={() => updateObject(selectedObject.id, (object) => ({
+                          ...object,
+                          material: {
+                            color: "#ffffff",
+                            roughness: 0.65,
+                            metalness: 0,
+                            emissive: "#000000",
+                            emissiveIntensity: 0,
+                            transparent: false,
+                            opacity: 1,
+                            wireframe: false,
+                            side: "front",
+                          },
+                          glow: { enabled: false, color: "#ffffff", intensity: 0 },
+                        }))}
+                        type="button"
+                      >
+                        Add material controls
+                      </button>
+                    )}
+                  </details>
+                  <details className="mt-3 rounded-lg border-2 border-surface-variant bg-surface-container-lowest p-3" open>
+                    <summary className="cursor-pointer select-none font-bold text-on-surface">
+                      <span className="material-symbols-outlined mr-2 align-middle text-lg">ads_click</span>
+                      Interactions
+                    </summary>
+                    {selectedObject.interactions ? (
+                      <div className="mt-3 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <label className="flex items-center gap-2">
+                            <input
+                              checked={selectedObject.interactions.enabled}
+                              onChange={(event) =>
+                                updateSelectedInteractions((interactions) => ({
+                                  ...interactions,
+                                  enabled: event.target.checked,
+                                }))
+                              }
+                              type="checkbox"
+                            />
+                            Enable interactions
+                          </label>
+                          <label className="flex items-center gap-2">
+                            Trigger
+                            <select
+                              className={inputClass}
+                              onChange={(event) =>
+                                updateSelectedInteractions((interactions) => ({
+                                  ...interactions,
+                                  trigger: event.target.value as "click",
+                                }))
+                              }
+                              value={selectedObject.interactions.trigger}
+                            >
+                              <option value="click">Click</option>
+                            </select>
+                          </label>
+                        </div>
+                        <div className="grid grid-cols-[1fr_auto] gap-2">
+                          <select
+                            aria-label="Interaction action type"
+                            className={inputClass}
+                            onChange={(event) =>
+                              setActionTypeToAdd(event.target.value as SceneInteractionAction["type"])
+                            }
+                            value={actionTypeToAdd}
+                          >
+                            <option value="playAudio">Play audio</option>
+                            <option value="stopAudio">Stop audio</option>
+                            <option value="playAnimation">Play animation</option>
+                            <option value="openModal">Open modal</option>
+                            <option value="openUrl">Open URL</option>
+                            <option value="showInformation">Show information</option>
+                            <option value="focusObject">Focus object</option>
+                            <option value="customAction">Custom action</option>
+                          </select>
+                          <button
+                            className={buttonClass}
+                            onClick={() =>
+                              updateSelectedInteractions((interactions) => ({
+                                ...interactions,
+                                actions: [...interactions.actions, newInteractionAction(actionTypeToAdd)],
+                              }))
+                            }
+                            type="button"
+                          >
+                            Add action
+                          </button>
+                        </div>
+                        {selectedObject.interactions.actions.length === 0 ? (
+                          <p className="rounded-md border border-dashed border-outline-variant p-3 text-on-surface-variant">
+                            No actions configured. Add an action to make this object interactive.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {selectedObject.interactions.actions.map((action, index) => (
+                              <InteractionActionFields
+                                action={action}
+                                count={selectedObject.interactions?.actions.length ?? 0}
+                                index={index}
+                                key={`${action.type}-${index}`}
+                                onChange={(nextAction) =>
+                                  updateSelectedInteractions((interactions) => ({
+                                    ...interactions,
+                                    actions: interactions.actions.map((item, itemIndex) =>
+                                      itemIndex === index ? nextAction : item,
+                                    ),
+                                  }))
+                                }
+                                onMove={(direction) =>
+                                  updateSelectedInteractions((interactions) => {
+                                    const nextIndex = index + direction;
+                                    if (nextIndex < 0 || nextIndex >= interactions.actions.length) return interactions;
+                                    const actions = [...interactions.actions];
+                                    [actions[index], actions[nextIndex]] = [actions[nextIndex], actions[index]];
+                                    return { ...interactions, actions };
+                                  })
+                                }
+                                onDuplicate={() =>
+                                  updateSelectedInteractions((interactions) => ({
+                                    ...interactions,
+                                    actions: [
+                                      ...interactions.actions.slice(0, index + 1),
+                                      structuredClone(action),
+                                      ...interactions.actions.slice(index + 1),
+                                    ],
+                                  }))
+                                }
+                                onRemove={() =>
+                                  updateSelectedInteractions((interactions) => ({
+                                    ...interactions,
+                                    actions: interactions.actions.filter((_, itemIndex) => itemIndex !== index),
+                                  }))
+                                }
+                              />
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className={buttonClass}
+                            onClick={() => updateSelectedInteractions(() => ({
+                              enabled: false,
+                              trigger: "click",
+                              actions: [],
+                            }))}
+                            type="button"
+                          >
+                            Reset interactions
+                          </button>
+                          <button
+                            className={buttonClass}
+                            onClick={() =>
+                              setMessage(
+                                selectedObject.interactions?.actions.length
+                                  ? "Preview: safe actions can be tested by clicking the object in presentation mode."
+                                  : "Add an action before previewing.",
+                              )
+                            }
+                            type="button"
+                          >
+                            Preview
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        className={`${buttonClass} mt-3`}
+                        onClick={() =>
+                          updateSelectedInteractions(() => ({
+                            enabled: false,
+                            trigger: "click",
+                            actions: [],
+                          }))
+                        }
+                        type="button"
+                      >
+                        Add interaction settings
+                      </button>
+                    )}
+                  </details>
                 </>
               ) : (
                 <p className="text-sm text-on-surface-variant">No object selected.</p>
@@ -974,6 +1662,8 @@ export function DeskSceneEditor({
       )}
     </div>
   );
+
+  return typeof document === "undefined" ? null : createPortal(editor, document.body);
 }
 
 function TransformFields({

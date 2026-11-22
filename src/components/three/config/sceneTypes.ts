@@ -15,6 +15,72 @@ export type SceneObjectTransform = {
   scale: VectorTuple;
 };
 
+export type SceneInteractionAction =
+  | { type: "playAudio"; id?: string; audio: string; volume?: number; loop?: boolean }
+  | { type: "stopAudio"; id?: string; targetObjectId?: string }
+  | { type: "playAnimation"; animation: string; loop?: boolean; timeScale?: number; duration?: number }
+  | { type: "openModal"; modal: string; title?: string; content?: string }
+  | { type: "openUrl"; url: string; target?: "_self" | "_blank" }
+  | { type: "showInformation"; title: string; content: string }
+  | { type: "focusObject"; objectId?: string; duration?: number }
+  | { type: "customAction"; name: string; payload?: Record<string, string | number | boolean> };
+
+export type SceneObjectInteractions = {
+  enabled: boolean;
+  trigger: "click";
+  actions: SceneInteractionAction[];
+};
+
+export type ScenePrimitiveType =
+  | "box"
+  | "sphere"
+  | "cylinder"
+  | "plane"
+  | "cone"
+  | "torus"
+  | "capsule"
+  | "circle"
+  | "ring";
+
+export type ScenePrimitiveGeometry = {
+  type: ScenePrimitiveType;
+  parameters: Record<string, number>;
+};
+
+export type SceneObjectMaterial = {
+  color: string;
+  roughness: number;
+  metalness: number;
+  emissive: string;
+  emissiveIntensity: number;
+  transparent: boolean;
+  opacity: number;
+  wireframe: boolean;
+  side: "front" | "back" | "double";
+};
+
+export type SceneObjectGlow = {
+  enabled: boolean;
+  color: string;
+  intensity: number;
+};
+
+export type SceneObjectPresetAnimation =
+  | "pulse"
+  | "bounce"
+  | "rotate"
+  | "violin-sway";
+
+export type SceneObjectAnimation = {
+  id: string;
+  name: string;
+  type: "embedded" | "preset";
+  clipName?: string;
+  preset?: SceneObjectPresetAnimation;
+  loop: boolean;
+  timeScale: number;
+};
+
 export type SceneObjectInstance = {
   id: string;
   assetId: string;
@@ -24,6 +90,12 @@ export type SceneObjectInstance = {
   castShadow: boolean;
   receiveShadow: boolean;
   transform: SceneObjectTransform;
+  interactions?: SceneObjectInteractions;
+  geometry?: ScenePrimitiveGeometry;
+  material?: SceneObjectMaterial;
+  glow?: SceneObjectGlow;
+  animations?: SceneObjectAnimation[];
+  defaultAnimationId?: string;
 };
 
 type SceneLightBase = {

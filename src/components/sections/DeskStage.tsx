@@ -11,6 +11,7 @@ import {
 } from "../three/config/defaultScene";
 import type { CameraView, SceneCameraStop, SceneConfiguration } from "../three/config/sceneTypes";
 import { ConfiguredSceneRuntime } from "../three/runtime/ConfiguredSceneRuntime";
+import { SceneInteractionController } from "../three/runtime/SceneInteractionController";
 import {
   Suspense,
   useCallback,
@@ -27,10 +28,12 @@ function BowPlayingAnimation({
   bow,
   strings,
   story,
+  animationToken,
 }: {
   bow: RefObject<Object3D | null>;
   strings: RefObject<Object3D | null>;
   story: RefObject<HTMLDivElement | null>;
+  animationToken: number;
 }) {
   const basePosition = useRef(new Vector3());
   const baseRotation = useRef(new Vector3());
@@ -88,8 +91,9 @@ function BowPlayingAnimation({
     }
 
     const time = clock.elapsedTime;
-    const stroke = Math.sin(time * 2.8);
-    const returnStroke = Math.sin(time * 5.6);
+    const playingBoost = animationToken > 0 ? 1.8 : 1;
+    const stroke = Math.sin(time * 2.8) * playingBoost;
+    const returnStroke = Math.sin(time * 5.6) * playingBoost;
 
     // The Bow node is fitted with the rest of the GLB, so these are local offsets.
     bowObject.position.set(
@@ -111,10 +115,12 @@ function CameraMotion({
   story,
   onStep,
   cameraStops,
+  editing,
 }: {
   story: RefObject<HTMLDivElement | null>;
   onStep: (view: CameraView) => void;
   cameraStops: SceneCameraStop[];
+  editing: boolean;
 }) {
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const currentStep = useRef<CameraView | null>(null);
@@ -124,6 +130,10 @@ function CameraMotion({
   const nextTarget = useRef(new Vector3());
 
   useFrame(({ camera }, delta) => {
+    if (editing) {
+      controls.current?.update();
+      return;
+    }
     const element = story.current;
     if (!element) return;
 
@@ -172,7 +182,9 @@ function CameraMotion({
     <OrbitControls
       ref={controls}
       enableDamping
-      enableZoom={true}
+      enableRotate={editing}
+      enablePan={editing}
+      enableZoom={editing}
       dampingFactor={0.08}
       // maxDistance={14}
       minDistance={1.5}
@@ -195,6 +207,13 @@ function RoomScene({
   onObjectRef,
   onTransformCommit,
   editorEnabled,
+  onSelectedObject,
+  animationToken,
+  onInformation,
+  onFocusObject,
+  onAnimation,
+  activeAnimations,
+  onEmbeddedAnimationsDiscovered,
 }: {
   story: RefObject<HTMLDivElement | null>;
   onStep: (view: CameraView) => void;
@@ -209,6 +228,13 @@ function RoomScene({
   onObjectRef: (id: string, object: Group | null) => void;
   onTransformCommit: (id: string) => void;
   editorEnabled: boolean;
+  onSelectedObject: (id: string) => void;
+  animationToken: number;
+  onInformation: (title: string, content: string) => void;
+  onFocusObject: (objectId: string, duration: number) => void;
+  onAnimation: (objectId: string, animation: string, duration: number) => void;
+  activeAnimations: Record<string, string>;
+  onEmbeddedAnimationsDiscovered: (id: string, clipNames: string[]) => void;
 }) {
   const bowRef = useRef<Object3D | null>(null);
   const stringsRef = useRef<Object3D | null>(null);
@@ -225,8 +251,15 @@ function RoomScene({
         configuration={configuration}
         onObjectRef={onObjectRef}
         onNamedObjectRef={handleNamedObjectRef}
+        activeAnimations={activeAnimations}
+        onEmbeddedAnimationsDiscovered={onEmbeddedAnimationsDiscovered}
       />
-      <BowPlayingAnimation bow={bowRef} strings={stringsRef} story={story} />
+      <BowPlayingAnimation
+        bow={bowRef}
+        strings={stringsRef}
+        story={story}
+        animationToken={animationToken}
+      />
       <SceneTransformGizmo
         active={editorEnabled && editorOpen}
         object={objectRefs.current[selectedObject]}
@@ -235,7 +268,21 @@ function RoomScene({
         snapEnabled={snapEnabled}
         onCommit={() => onTransformCommit(selectedObject)}
       />
-      <CameraMotion story={story} onStep={onStep} cameraStops={configuration.cameraStops} />
+      <CameraMotion
+        story={story}
+        onStep={onStep}
+        cameraStops={configuration.cameraStops}
+        editing={editorEnabled && editorOpen}
+      />
+      <SceneInteractionController
+        configuration={configuration}
+        editing={editorEnabled && editorOpen}
+        objectRefs={objectRefs}
+        onSelectedChange={onSelectedObject}
+        onInformation={onInformation}
+        onAnimation={onAnimation}
+        onFocusObject={onFocusObject}
+      />
       {editorOpen && (
         <>
           <gridHelper args={[20, 20]} />
@@ -322,10 +369,15 @@ export default function DeskStage() {
   );
   const configuration = history.configuration;
   const [editorOpen, setEditorOpen] = useState(false);
+  const [sceneExpanded, setSceneExpanded] = useState(false);
   const [selectedObject, setSelectedObject] = useState("desk");
   const [transformMode, setTransformMode] = useState<TransformMode>("translate");
   const [transformSpace, setTransformSpace] = useState<"world" | "local">("world");
   const [snapEnabled, setSnapEnabled] = useState(false);
+  const [interactionInfo, setInteractionInfo] = useState<{ title: string; content: string } | null>(null);
+  const [animationToken, setAnimationToken] = useState(0);
+  const [activeAnimations, setActiveAnimations] = useState<Record<string, string>>({});
+  const [embeddedAnimations, setEmbeddedAnimations] = useState<Record<string, string[]>>({});
   const editorEnabled = process.env.NODE_ENV === "development";
   const objectRefs = useRef<Record<string, Group | null>>({});
   const registerObject = useCallback((id: string, object: Group | null) => {
@@ -388,6 +440,59 @@ export default function DeskStage() {
     ? configuration
     : defaultSceneConfiguration;
 
+  const handleFocusObject = useCallback((objectId: string, duration: number) => {
+    const viewByObject: Partial<Record<string, CameraView>> = {
+      violin: "violin",
+      laptop: "laptop",
+    };
+    const view = viewByObject[objectId];
+    if (!view) return;
+    const stop = renderedConfiguration.cameraStops.find((item) => item.view === view);
+    if (stop) {
+      const element = story.current;
+      if (!element) return;
+      const distance = Math.max(element.offsetHeight - window.innerHeight, 0);
+      window.scrollTo({
+        top: window.scrollY + element.getBoundingClientRect().top + distance * stop.progress,
+        behavior: duration > 0 ? "smooth" : "auto",
+      });
+    }
+  }, [renderedConfiguration.cameraStops]);
+
+  const handleAnimation = useCallback(
+    (objectId: string, animation: string) => {
+      const object = renderedConfiguration.objects.find((item) => item.id === objectId);
+      if (!object) return;
+      const definition = object.animations?.find(
+        (item) =>
+          item.id === animation ||
+          item.name === animation ||
+          item.clipName === animation,
+      );
+      const animationId =
+        definition?.id ??
+        object.animations?.find((item) => item.name === animation)?.id ??
+        object.defaultAnimationId;
+      if (animationId) {
+        setActiveAnimations((current) => ({ ...current, [objectId]: animationId }));
+      }
+      setAnimationToken((value) => value + 1);
+    },
+    [renderedConfiguration.objects],
+  );
+
+  const handleEmbeddedAnimationsDiscovered = useCallback((id: string, clipNames: string[]) => {
+    setEmbeddedAnimations((current) => {
+      if (
+        current[id]?.length === clipNames.length &&
+        current[id]?.every((name, index) => name === clipNames[index])
+      ) {
+        return current;
+      }
+      return { ...current, [id]: clipNames };
+    });
+  }, []);
+
   const scrollToProgress = useCallback((progress: number) => {
     const element = story.current;
     if (!element) return;
@@ -445,7 +550,11 @@ export default function DeskStage() {
             </div>
 
             <div
-              className="relative min-h-0 flex-1 w-full rounded-2xl bg-surface-container-low border-2 border-surface-variant shadow-[6px_6px_0px_#080d22] overflow-hidden"
+              className={
+                sceneExpanded
+                  ? "fixed inset-0 z-[70] h-screen w-screen overflow-hidden bg-surface-container-low"
+                  : "relative min-h-0 flex-1 w-full rounded-2xl bg-surface-container-low border-2 border-surface-variant shadow-[6px_6px_0px_#080d22] overflow-hidden"
+              }
               ref={sceneContainer}
             >
               {sceneVisible ? (
@@ -470,6 +579,13 @@ export default function DeskStage() {
                       onObjectRef={registerObject}
                       onTransformCommit={commitObjectTransform}
                       editorEnabled={editorEnabled}
+                      onSelectedObject={setSelectedObject}
+                      animationToken={animationToken}
+                      onInformation={(title, content) => setInteractionInfo({ title, content })}
+                      onFocusObject={handleFocusObject}
+                      onAnimation={handleAnimation}
+                      activeAnimations={activeAnimations}
+                      onEmbeddedAnimationsDiscovered={handleEmbeddedAnimationsDiscovered}
                     />
                   </Suspense>
                 </Canvas>
@@ -486,6 +602,24 @@ export default function DeskStage() {
                   <span className="rounded-lg bg-surface-container-lowest/95 px-4 py-3">
                     Loading desk models…
                   </span>
+                </div>
+              )}
+              {interactionInfo && (
+                <div className="absolute bottom-3 left-1/2 z-30 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-xl border-2 border-surface-variant bg-surface-container-lowest p-4 shadow-[4px_4px_0px_#080d22]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-on-surface">{interactionInfo.title}</p>
+                      <p className="mt-1 text-sm text-on-surface-variant">{interactionInfo.content}</p>
+                    </div>
+                    <button
+                      aria-label="Close information"
+                      className="material-symbols-outlined text-xl text-on-surface"
+                      onClick={() => setInteractionInfo(null)}
+                      type="button"
+                    >
+                      close
+                    </button>
+                  </div>
                 </div>
               )}
               {editorEnabled && sceneVisible && modelsReady && (
@@ -516,6 +650,9 @@ export default function DeskStage() {
                   onRedo={() => dispatchHistory({ type: "redo" })}
                   canUndo={history.past.length > 0}
                   canRedo={history.future.length > 0}
+                  expanded={sceneExpanded}
+                  onExpandedChange={setSceneExpanded}
+                  embeddedAnimations={embeddedAnimations}
                 />
               )}
 
@@ -548,7 +685,7 @@ export default function DeskStage() {
                     })}
                   </div>
                   <div className="absolute bottom-3 left-3 z-20 rounded-lg border border-surface-variant bg-surface-container-lowest/90 px-3 py-2 font-label-code-sm text-label-code-sm text-on-surface-variant backdrop-blur-md sm:bottom-5 sm:left-5">
-                    Scroll to explore · Drag to orbit
+                    Scroll to explore · Click objects to interact
                   </div>
                 </>
               )}

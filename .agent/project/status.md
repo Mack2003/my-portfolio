@@ -47,7 +47,11 @@ For every future UI change, run the app and inspect the changed page in a browse
 - The About portrait uses the supplied transparent PNG converted to lossless WebP at `public/images/malay-portrait.webp`; visible pixels are unchanged. The SVG beam starts at the UFO underside, uses neutral-white light behind the sharp cutout, and fades its lower edge to transparency. Frame, UFO, and spotlight motion respect reduced-motion settings.
 - The desk scene uses the recursive model registry and retains viewport-triggered loading, the existing scroll camera, and violin bow animation. The existing 9px narrow-screen overflow comes from the unchanged reference layout.
 - The GLBs already include a root rotation converting their source axes; do not apply another X-axis rotation when fitting them. The room opening faces the camera, which now looks down onto the desktop rather than up at the model undersides.
-- Desk story uses a sticky scene during scroll: room overview → violin beside the desk → laptop close-up → laptop-screen close-up. Scroll rather than wheel zoom controls this camera path; drag remains available to orbit.
+- - Desk story uses a sticky scene during scroll: room overview → violin beside the desk → laptop close-up → laptop-screen close-up. Scroll rather than wheel zoom controls this camera path; editing mode restores orbit/pan/zoom, while presentation mode keeps the camera scroll-controlled.
+- The desk editor supports registered GLBs and standard Three.js primitives, per-object materials, emissive colors/intensity, wireframe/opacity controls, and configurable object glow/point lights.
+- Object selection is synchronized between scene raycasts and the Objects hierarchy; the room root is excluded as a selectable editor object.
+- Objects support serializable preset and embedded-clip animations, default-animation selection, animation speed/loop controls, and scene-click `playAnimation` actions.
+- The editor can expand the 3D scene to full-screen and provides a movable settings panel with an explicit exit button and Escape-key exit.
 - Browser comparison of copied DOM and section geometry matched the source at 390px, 820px and 1440px. Both source and app have 9px horizontal overflow at 390px and 820px; preserved in this verbatim pass.
 - A scoped Material Symbols font-size cascade adjustment in `globals.css` is needed because Next.js loads the Google Fonts stylesheets after the imported global stylesheet.
 - TODO: Malay's Phase 1–4 briefs are not present; add them verbatim when supplied.
