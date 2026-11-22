@@ -82,28 +82,6 @@
   }
 }
 
-@keyframes hero-squiggle-wave {
-  0%,
-  100% {
-    transform: rotate(-3deg) scaleY(0.82);
-  }
-
-  50% {
-    transform: rotate(3deg) scaleY(1.12);
-  }
-}
-
-@keyframes hero-squiggle-ribbon {
-  0%,
-  100% {
-    d: path("M 5 20 Q 20 5 35 20 Q 50 35 65 20 Q 80 5 95 20 Q 105 30 115 20");
-  }
-
-  50% {
-    d: path("M 5 20 Q 20 35 35 20 Q 50 5 65 20 Q 80 35 95 20 Q 105 10 115 20");
-  }
-}
-
 @keyframes hero-hand-wave {
   0%,
   100% {
@@ -136,12 +114,12 @@
 }
 
 .hero-squiggle {
-  animation: hero-squiggle-wave 1.8s ease-in-out infinite;
   transform-origin: center;
+  animation: none !important;
 }
 
 .hero-squiggle-path {
-  animation: hero-squiggle-ribbon 1.8s ease-in-out infinite;
+  animation: none !important;
 }
 
 .hero-wave-hand {
@@ -150,8 +128,10 @@
 }
 
 .hero-name:hover ~ .hero-wave-hand,
-.hero-wave-hand:hover {
-  animation: hero-hand-wave 0.8s ease-in-out infinite;
+.hero-wave-hand:hover,
+.hero-wave-hand.is-waving,
+[data-hero-active="true"] .hero-wave-hand {
+  animation: hero-hand-wave 0.85s ease-in-out 1;
 }
 
 .about-ufo-scene {
@@ -239,7 +219,9 @@
 }
 
 .about-ufo-scene:hover .about-ufo,
-.about-ufo-scene:focus-visible .about-ufo {
+.about-ufo-scene:focus-visible .about-ufo,
+.about-ufo-scene.is-projecting .about-ufo,
+.about-ufo-scene[data-active="true"] .about-ufo {
   top: -3.25rem;
   right: auto;
   left: 50%;
@@ -248,13 +230,17 @@
 }
 
 .about-ufo-scene:hover .portrait-image,
-.about-ufo-scene:focus-visible .portrait-image {
+.about-ufo-scene:focus-visible .portrait-image,
+.about-ufo-scene.is-projecting .portrait-image,
+.about-ufo-scene[data-active="true"] .portrait-image {
   filter: brightness(1.12) saturate(1.04) drop-shadow(0 0 8px rgb(255 255 255 / 55%));
   transform: scale(1.04);
 }
 
 .about-ufo-scene:hover .portrait-spotlight,
-.about-ufo-scene:focus-visible .portrait-spotlight {
+.about-ufo-scene:focus-visible .portrait-spotlight,
+.about-ufo-scene.is-projecting .portrait-spotlight,
+.about-ufo-scene[data-active="true"] .portrait-spotlight {
   opacity: 1;
   transform: scaleY(1);
 }
@@ -310,10 +296,10 @@
   .hero-asterisk,
   .hero-confetti-dot,
   .hero-confetti-diamond,
-  .hero-squiggle,
-  .hero-squiggle-path,
   .hero-name:hover ~ .hero-wave-hand,
-  .hero-wave-hand:hover {
+  .hero-wave-hand:hover,
+  .hero-wave-hand.is-waving,
+  [data-hero-active="true"] .hero-wave-hand {
     animation: none;
   }
 

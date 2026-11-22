@@ -1,0 +1,1208 @@
+{
+  "id": "main-portfolio-scene",
+  "name": "Malay Portfolio Desk",
+  "version": 1,
+  "enabled": true,
+  "objects": [
+    {
+      "id": "room",
+      "assetId": "empty-room",
+      "name": "Room",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": false,
+        "trigger": "click",
+        "actions": []
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          -90,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "desk",
+      "assetId": "desk",
+      "name": "Desk",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": false,
+        "trigger": "click",
+        "actions": []
+      },
+      "transform": {
+        "position": [
+          1.4,
+          0.33680924933708056,
+          -2.55
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "laptop",
+      "assetId": "laptop",
+      "name": "Laptop",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": false,
+        "trigger": "click",
+        "actions": []
+      },
+      "transform": {
+        "position": [
+          1.7943374055672503,
+          1.4276956980916684,
+          -2.8391305654821655
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "plant",
+      "assetId": "plant",
+      "name": "Plant",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": false,
+        "trigger": "click",
+        "actions": []
+      },
+      "transform": {
+        "position": [
+          0.5150641627352065,
+          1.4823053142979226,
+          -2.8
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "violin",
+      "assetId": "violen-with-bow",
+      "name": "Violin and bow",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "showInformation",
+            "title": "Violin",
+            "content": "The violin is one of the interactive objects in Malay's desk."
+          }
+        ]
+      },
+      "animations": [
+        {
+          "id": "violin-bow-swing-default",
+          "name": "Bow swinging",
+          "type": "preset",
+          "preset": "bow-swing",
+          "loop": true,
+          "timeScale": 1,
+          "duration": 5,
+          "enabledInSequence": true
+        }
+      ],
+      "defaultAnimationId": "violin-bow-swing-default",
+      "transform": {
+        "position": [
+          -2,
+          1.13,
+          -3.25
+        ],
+        "rotation": [
+          -1,
+          -31,
+          -66
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "bookshelf",
+      "assetId": "delux-book-helf",
+      "name": "Deluxe bookshelf",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": false,
+        "trigger": "click",
+        "actions": []
+      },
+      "transform": {
+        "position": [
+          -2.77508776585715,
+          0.0954240396727165,
+          0.79093974710241
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          0.15,
+          0.15,
+          0.15
+        ]
+      }
+    },
+    {
+      "id": "officeChair",
+      "assetId": "office-chair",
+      "name": "Office chair",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": false,
+        "trigger": "click",
+        "actions": []
+      },
+      "transform": {
+        "position": [
+          2.25109948797576,
+          0.1,
+          -0.389131411581569
+        ],
+        "rotation": [
+          0,
+          -70,
+          0
+        ],
+        "scale": [
+          0.8,
+          0.8,
+          0.8
+        ]
+      }
+    },
+    {
+      "id": "vitest3dLogo",
+      "assetId": "skills-icons-vitest-3d-logo",
+      "name": "Vitest 3D",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.68441860615043,
+          2.15,
+          0.07235634713682
+        ],
+        "rotation": [
+          0,
+          90,
+          0
+        ],
+        "scale": [
+          0.8,
+          0.8,
+          2
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "front",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#73f52e",
+        "intensity": 0.6,
+        "offsetY": 0
+      },
+      "defaultAnimationId": "preset-animation-ddece75d-5594-46ce-aff6-cd928d4e2e39",
+      "animations": [
+        {
+          "id": "preset-animation-ddece75d-5594-46ce-aff6-cd928d4e2e39",
+          "name": "Pulse",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.5,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "visualStudioCode",
+      "assetId": "skills-icons-visual-studio-code",
+      "name": "Visual Studio Code",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.71199298158249,
+          0.45,
+          1.6613121240024
+        ],
+        "rotation": [
+          0,
+          80,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          2.35
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "front",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#50bafb",
+        "intensity": 0.6,
+        "offsetY": 0
+      },
+      "defaultAnimationId": "preset-animation-369c095c-0af2-4d8b-a481-2efb8c2c690a",
+      "animations": [
+        {
+          "id": "preset-animation-369c095c-0af2-4d8b-a481-2efb8c2c690a",
+          "name": "Pulse",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.8,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "typescriptLogo",
+      "assetId": "skills-icons-typescript-logo",
+      "name": "TypeScript",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.56823574672851,
+          1.56696626747815,
+          1.55275854306419
+        ],
+        "rotation": [
+          0,
+          83,
+          0
+        ],
+        "scale": [
+          0.8,
+          0.8,
+          1.35
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "back",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#3d8af0",
+        "intensity": 0.9,
+        "offsetY": 0
+      },
+      "defaultAnimationId": "preset-animation-01bb0708-982f-466e-9fe4-2d7cf13fb764",
+      "animations": [
+        {
+          "id": "preset-animation-01bb0708-982f-466e-9fe4-2d7cf13fb764",
+          "name": "Pulse",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.5,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "reactLogoCircle",
+      "assetId": "skills-icons-react-logo-circle",
+      "name": "React",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.67833279422287,
+          0.98665213383007,
+          1.61947348644007
+        ],
+        "rotation": [
+          0,
+          89,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "back",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#312eff",
+        "intensity": 1.2,
+        "offsetY": 0
+      },
+      "defaultAnimationId": "preset-animation-9dd90692-2340-4a08-9734-d00e3d36fdfb",
+      "animations": [
+        {
+          "id": "preset-animation-9dd90692-2340-4a08-9734-d00e3d36fdfb",
+          "name": "Pulse",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.7,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "javascriptLogo",
+      "assetId": "skills-icons-javascript-logo",
+      "name": "JavaScript",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.8386012459367,
+          2.12926621966168,
+          1.59210580228685
+        ],
+        "rotation": [
+          0,
+          86,
+          0
+        ],
+        "scale": [
+          0.8,
+          0.8,
+          3.55
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 4,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "back",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#f6f94e",
+        "intensity": 0.6,
+        "offsetY": 0
+      },
+      "defaultAnimationId": "preset-animation-acf41cca-1b0e-432c-8c62-157da6ace28a",
+      "animations": [
+        {
+          "id": "preset-animation-acf41cca-1b0e-432c-8c62-157da6ace28a",
+          "name": "Pulse",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.6,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "githubKitten",
+      "assetId": "skills-icons-github-kitten",
+      "name": "GitHub",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.63829639176913,
+          0.4796434395764,
+          0.79935955318535
+        ],
+        "rotation": [
+          0,
+          97,
+          0
+        ],
+        "scale": [
+          1.5,
+          1.5,
+          1.5
+        ]
+      },
+      "animations": [
+        {
+          "id": "embedded-clip-4ddb41ef-815a-44ab-9784-8c2c91f03b62",
+          "name": "normal seeing ",
+          "type": "embedded",
+          "clipName": "normal seeing ",
+          "loop": true,
+          "timeScale": 1,
+          "enabledInSequence": true
+        },
+        {
+          "id": "embedded-clip-4a723561-3efe-4737-b8f1-352fac9cbfb1",
+          "name": "idle",
+          "type": "embedded",
+          "clipName": "idle",
+          "loop": true,
+          "timeScale": 1,
+          "enabledInSequence": true
+        },
+        {
+          "id": "embedded-clip-74ea6d6e-ff58-4af4-83f2-f01cfba73f9c",
+          "name": "tailanimation",
+          "type": "embedded",
+          "clipName": "tailanimation",
+          "loop": true,
+          "timeScale": 1,
+          "enabledInSequence": true
+        }
+      ],
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "front",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#fff0f0",
+        "intensity": 1.5,
+        "offsetY": 0
+      },
+      "defaultAnimationId": "embedded-clip-74ea6d6e-ff58-4af4-83f2-f01cfba73f9c",
+      "continueAllAnimationsInLoop": true
+    },
+    {
+      "id": "awsLogo",
+      "assetId": "skills-icons-aws-logo",
+      "name": "AWS",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.70329713106772,
+          1.55,
+          0.769715269211
+        ],
+        "rotation": [
+          0,
+          88,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          3.5
+        ]
+      },
+      "material": {
+        "color": "#121212",
+        "roughness": 0.75,
+        "metalness": 0.45,
+        "emissive": "#c8cb06",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "back",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#f5e642",
+        "intensity": 0.4,
+        "offsetY": 0.15
+      },
+      "defaultAnimationId": "preset-animation-8a4822ed-600b-4864-bb87-37c907089663",
+      "animations": [
+        {
+          "id": "preset-animation-8a4822ed-600b-4864-bb87-37c907089663",
+          "name": "Pulse",
+          "type": "preset",
+          "preset": "rotate",
+          "loop": true,
+          "timeScale": 1,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "androidBug",
+      "assetId": "skills-icons-android-bug",
+      "name": "Android",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.65314859487145,
+          0.96758828351696,
+          0.0420910091237
+        ],
+        "rotation": [
+          0,
+          93,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "front",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#c1fbac",
+        "intensity": 2.4,
+        "offsetY": 0.25
+      },
+      "defaultAnimationId": "embedded-clip-96333e07-565f-49e1-ae9e-6eaeccf31699",
+      "animations": [
+        {
+          "id": "embedded-clip-96333e07-565f-49e1-ae9e-6eaeccf31699",
+          "name": "ArmatureAction.001",
+          "type": "embedded",
+          "clipName": "ArmatureAction.001",
+          "loop": true,
+          "timeScale": 0.8,
+          "enabledInSequence": true
+        }
+      ]
+    },
+    {
+      "id": "firebase-logo-3bebdf91-c19a-4fb7-bd20-c61fd328740f",
+      "assetId": "firebase-logo",
+      "name": "Firebase Logo",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.7,
+          0.436809249337081,
+          0.05
+        ],
+        "rotation": [
+          0,
+          -90,
+          0
+        ],
+        "scale": [
+          0.3,
+          0.3,
+          1
+        ]
+      },
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "front",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#fb4141",
+        "intensity": 2,
+        "offsetY": 0.35
+      },
+      "animations": [
+        {
+          "id": "preset-animation-ba75aaa3-2a5d-4d1d-a3ba-5d5cfcb53c75",
+          "name": "Floating hover",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.8,
+          "duration": 3,
+          "enabledInSequence": true
+        }
+      ],
+      "defaultAnimationId": "preset-animation-ba75aaa3-2a5d-4d1d-a3ba-5d5cfcb53c75"
+    },
+    {
+      "id": "mongodb-logo-3d-model-451d068b-41f3-4ca6-a485-8577d21681e1",
+      "assetId": "mongodb-logo-3d-model",
+      "name": "Mongodb Logo 3d Model",
+      "enabled": true,
+      "visible": true,
+      "castShadow": false,
+      "receiveShadow": false,
+      "interactions": {
+        "enabled": true,
+        "trigger": "click",
+        "actions": [
+          {
+            "type": "enterCubeView",
+            "duration": 1.5,
+            "cameraDistance": 3.8,
+            "cameraHeight": 1.2
+          }
+        ]
+      },
+      "transform": {
+        "position": [
+          -2.8,
+          1.53680924933708,
+          0.05
+        ],
+        "rotation": [
+          0,
+          82,
+          0
+        ],
+        "scale": [
+          0.15,
+          0.15,
+          1
+        ]
+      },
+      "animations": [
+        {
+          "id": "preset-animation-abcc1ff7-bdf5-4769-bcff-7f59712bc5c5",
+          "name": "Floating hover",
+          "type": "preset",
+          "preset": "floating-hover",
+          "loop": true,
+          "timeScale": 0.7,
+          "duration": 3,
+          "enabledInSequence": true
+        }
+      ],
+      "defaultAnimationId": "preset-animation-abcc1ff7-bdf5-4769-bcff-7f59712bc5c5",
+      "material": {
+        "color": "#ffffff",
+        "roughness": 0.65,
+        "metalness": 0,
+        "emissive": "#000000",
+        "emissiveIntensity": 0,
+        "transparent": false,
+        "opacity": 1,
+        "wireframe": false,
+        "side": "front",
+        "preserveTextureAndColor": true
+      },
+      "glow": {
+        "enabled": true,
+        "color": "#7efb93",
+        "intensity": 0.6,
+        "offsetY": 1.4
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "ambient-light",
+      "name": "Ambient Light",
+      "type": "ambient",
+      "enabled": true,
+      "visible": true,
+      "color": "#ffffff",
+      "intensity": 1.5
+    },
+    {
+      "id": "hemisphere-light",
+      "name": "Hemisphere Light",
+      "type": "hemisphere",
+      "enabled": true,
+      "visible": true,
+      "color": "#dce8ff",
+      "groundColor": "#453b39",
+      "intensity": 2
+    },
+    {
+      "id": "directional-light",
+      "name": "Directional Light",
+      "type": "directional",
+      "enabled": true,
+      "visible": true,
+      "color": "#ffffff",
+      "intensity": 3,
+      "position": [
+        -4,
+        9,
+        6
+      ],
+      "target": [
+        0,
+        0,
+        0
+      ],
+      "shadows": false
+    }
+  ],
+  "environment": {
+    "background": "#2290b4",
+    "environmentIntensity": 1,
+    "shadows": false,
+    "toneMapping": "none",
+    "exposure": 1,
+    "pixelRatioCap": 1.5,
+    "fog": {
+      "enabled": false,
+      "color": "#11152f",
+      "near": 4,
+      "far": 30
+    }
+  },
+  "cameraStops": [
+    {
+      "progress": 0,
+      "view": "overview",
+      "position": [
+        0,
+        2,
+        4.7
+      ],
+      "target": [
+        0,
+        1.1,
+        -1.2
+      ]
+    },
+    {
+      "progress": 0.3,
+      "view": "wall",
+      "position": [
+        2.6,
+        1.5,
+        0.4
+      ],
+      "target": [
+        -16.9,
+        1.2,
+        -3.1
+      ]
+    },
+    {
+      "progress": 0.56,
+      "view": "violin",
+      "position": [
+        1.5,
+        1.3,
+        2
+      ],
+      "target": [
+        0,
+        1.05,
+        -1.1
+      ]
+    },
+    {
+      "progress": 0.78,
+      "view": "laptop",
+      "position": [
+        1.7,
+        2.2,
+        -0.45
+      ],
+      "target": [
+        1.9,
+        1.75,
+        -2.15
+      ]
+    },
+    {
+      "progress": 1,
+      "view": "screen",
+      "position": [
+        1.8,
+        2.4,
+        -1.45
+      ],
+      "target": [
+        1.8,
+        1.65,
+        -3.55
+      ]
+    }
+  ],
+  "cubeStudio": {
+    "enabled": true,
+    "cubeSize": 36,
+    "position": [
+      0,
+      80,
+      0
+    ],
+    "interiorColor": "#050508",
+    "roughness": 0.95,
+    "metalness": 0.05,
+    "cameraDistance": 3.8,
+    "cameraHeight": 1.2,
+    "transitionDuration": 2.2,
+    "objects": [
+      {
+        "id": "round-platform-9a0aa8d9-5fff-481a-bb5d-a3fa59bbf070",
+        "assetId": "round-platform",
+        "name": "Round Platform",
+        "enabled": true,
+        "visible": true,
+        "castShadow": true,
+        "receiveShadow": true,
+        "interactions": {
+          "enabled": false,
+          "trigger": "click",
+          "actions": []
+        },
+        "transform": {
+          "position": [
+            0,
+            -0.1799121696176229,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            2,
+            2,
+            2
+          ]
+        },
+        "material": {
+          "color": "#ffffff",
+          "roughness": 0.65,
+          "metalness": 0,
+          "emissive": "#000000",
+          "emissiveIntensity": 0,
+          "transparent": false,
+          "opacity": 1,
+          "wireframe": false,
+          "side": "front",
+          "preserveTextureAndColor": true
+        },
+        "glow": {
+          "enabled": true,
+          "color": "#2474f5",
+          "intensity": 11.1
+        }
+      },
+      {
+        "id": "appearance-effect-light-beam-3aa2e71d-64b6-4c8b-888b-eaeaf0a8d25f",
+        "assetId": "appearance-effect-light-beam",
+        "name": "Appearance Effect Light Beam",
+        "enabled": true,
+        "visible": true,
+        "castShadow": true,
+        "receiveShadow": true,
+        "interactions": {
+          "enabled": false,
+          "trigger": "click",
+          "actions": []
+        },
+        "transform": {
+          "position": [
+            0,
+            -0.6358525274120126,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            5,
+            5,
+            5
+          ]
+        },
+        "animations": [
+          {
+            "id": "embedded-clip-d7bb297e-b3a9-479e-8191-a157fba5efb7",
+            "name": "Take 001",
+            "type": "embedded",
+            "clipName": "Take 001",
+            "loop": true,
+            "timeScale": 1,
+            "enabledInSequence": true
+          }
+        ],
+        "defaultAnimationId": "embedded-clip-d7bb297e-b3a9-479e-8191-a157fba5efb7"
+      }
+    ],
+    "lights": [
+      {
+        "id": "cube-studio-fill-ambient",
+        "name": "Cube view target highlight",
+        "type": "ambient",
+        "enabled": true,
+        "visible": true,
+        "color": "#0a0a14",
+        "intensity": 0.3
+      },
+      {
+        "id": "point-90e78a26-528a-4df0-a697-49a40f68f30d",
+        "name": "New point light",
+        "enabled": true,
+        "visible": true,
+        "color": "#ffffff",
+        "intensity": 0.8,
+        "type": "point",
+        "position": [
+          0,
+          0.6,
+          1
+        ],
+        "distance": 0,
+        "decay": 2,
+        "shadows": false
+      }
+    ]
+  }
+}

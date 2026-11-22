@@ -1,13 +1,16 @@
 import { assetRegistry } from "../registry/assetRegistry";
-import { defaultCameraStops } from "./defaultScene";
+import defaultSceneJson from "./defaultScene.json";
 import type {
   CameraView,
+  SceneCameraStop,
   SceneConfiguration,
   SceneLight,
   SceneObjectInstance,
   SceneObjectTransform,
   ToneMappingMode,
 } from "./sceneTypes";
+
+const fallbackCameraStops = defaultSceneJson.cameraStops as SceneCameraStop[];
 
 const cameraViews = new Set<CameraView>([
   "overview",
@@ -119,6 +122,17 @@ function migrateAndDefaultConfiguration(value: unknown): unknown {
               opacity: object.material.opacity ?? 1,
               wireframe: object.material.wireframe ?? false,
               side: object.material.side ?? "front",
+              preserveTextureAndColor:
+                typeof object.material.preserveTextureAndColor === "boolean"
+                  ? object.material.preserveTextureAndColor
+                  : typeof object.material.preserveOriginalTexture === "boolean"
+                    ? object.material.preserveOriginalTexture
+                    : undefined,
+              selfGlow: typeof object.material.selfGlow === "boolean" ? object.material.selfGlow : undefined,
+              emissiveMapFromBase:
+                typeof object.material.emissiveMapFromBase === "boolean"
+                  ? object.material.emissiveMapFromBase
+                  : undefined,
             }
           : undefined;
         const glow = isRecord(object.glow)
@@ -126,10 +140,24 @@ function migrateAndDefaultConfiguration(value: unknown): unknown {
               enabled: object.glow.enabled ?? false,
               color: object.glow.color ?? "#ffffff",
               intensity: object.glow.intensity ?? 0,
+              offsetY: typeof object.glow.offsetY === "number" ? object.glow.offsetY : 0,
             }
           : undefined;
         const animations = Array.isArray(object.animations)
-          ? object.animations
+          ? object.animations.map((anim) => {
+              if (!isRecord(anim)) return anim;
+              return {
+                ...anim,
+                enabledInSequence:
+                  typeof anim.enabledInSequence === "boolean"
+                    ? anim.enabledInSequence
+                    : true,
+                duration:
+                  typeof anim.duration === "number" && !isNaN(anim.duration) && anim.duration > 0
+                    ? anim.duration
+                    : undefined,
+              };
+            })
           : undefined;
         const interactions = isRecord(object.interactions)
           ? {
@@ -158,6 +186,10 @@ function migrateAndDefaultConfiguration(value: unknown): unknown {
           defaultAnimationId:
             typeof object.defaultAnimationId === "string"
               ? object.defaultAnimationId
+              : undefined,
+          continueAllAnimationsInLoop:
+            typeof object.continueAllAnimationsInLoop === "boolean"
+              ? object.continueAllAnimationsInLoop
               : undefined,
           transform: {
             ...transform,
@@ -222,7 +254,7 @@ function migrateAndDefaultConfiguration(value: unknown): unknown {
       far: fog.far ?? 30,
     },
   };
-  migrated.cameraStops ??= structuredClone(defaultCameraStops);
+  migrated.cameraStops ??= structuredClone(fallbackCameraStops);
   return migrated;
 }
 
@@ -292,6 +324,17 @@ function validateInteractions(value: unknown, issues: string[], label: string): 
       case "focusObject":
         if ((action.objectId !== undefined && !isNonEmptyString(action.objectId)) || (action.duration !== undefined && (!isFiniteNumber(action.duration) || action.duration <= 0))) valid = false;
         break;
+      case "enterCubeView":
+        if (
+          (action.id !== undefined && !isNonEmptyString(action.id)) ||
+          (action.targetObjectId !== undefined && !isNonEmptyString(action.targetObjectId)) ||
+          (action.duration !== undefined && (!isFiniteNumber(action.duration) || action.duration <= 0)) ||
+          (action.cameraDistance !== undefined && (!isFiniteNumber(action.cameraDistance) || action.cameraDistance <= 0)) ||
+          (action.cameraHeight !== undefined && !isFiniteNumber(action.cameraHeight))
+        ) {
+          valid = false;
+        }
+        break;
       case "customAction":
         if (!isNonEmptyString(action.name)) valid = false;
         break;
@@ -307,8 +350,9 @@ function validateObject(
   value: unknown,
   index: number,
   issues: string[],
+  prefix = "Object",
 ): value is SceneObjectInstance {
-  const label = `Object ${index + 1}`;
+  const label = `${prefix} ${index + 1}`;
   if (!isRecord(value)) {
     issues.push(`${label} must be an object.`);
     return false;
@@ -374,7 +418,15 @@ function validateObject(
         value.material.opacity > 1 ||
         !isBoolean(value.material.transparent) ||
         !isBoolean(value.material.wireframe) ||
-        !["front", "back", "double"].includes(String(value.material.side))
+        !["front", "back", "double"].includes(String(value.material.side)) ||
+        (value.material.preserveTextureAndColor !== undefined &&
+          !isBoolean(value.material.preserveTextureAndColor)) ||
+        (value.material.preserveOriginalTexture !== undefined &&
+          !isBoolean(value.material.preserveOriginalTexture)) ||
+        (value.material.selfGlow !== undefined &&
+          !isBoolean(value.material.selfGlow)) ||
+        (value.material.emissiveMapFromBase !== undefined &&
+          !isBoolean(value.material.emissiveMapFromBase))
       ) {
         issues.push(`${label} material properties are invalid.`);
         valid = false;
@@ -387,9 +439,17 @@ function validateObject(
       !isBoolean(value.glow.enabled) ||
       !isColor(value.glow.color) ||
       !isFiniteNumber(value.glow.intensity) ||
-      value.glow.intensity < 0
+      value.glow.intensity < 0 ||
+      (value.glow.offsetY !== undefined && !isFiniteNumber(value.glow.offsetY))
     ) {
-      issues.push(`${label} glow requires an enabled flag, #RRGGBB color, and non-negative intensity.`);
+      issues.push(`${label} glow requires an enabled flag, #RRGGBB color, non-negative intensity, and optional finite offsetY.`);
+      valid = false;
+    }
+    if (
+      value.continueAllAnimationsInLoop !== undefined &&
+      !isBoolean(value.continueAllAnimationsInLoop)
+    ) {
+      issues.push(`${label} continueAllAnimationsInLoop must be a boolean.`);
       valid = false;
     }
   }
@@ -410,7 +470,9 @@ function validateObject(
           (animation.type !== "embedded" && animation.type !== "preset") ||
           !isBoolean(animation.loop) ||
           !isFiniteNumber(animation.timeScale) ||
-          animation.timeScale <= 0
+          animation.timeScale <= 0 ||
+          (animation.duration !== undefined && (!isFiniteNumber(animation.duration) || animation.duration <= 0)) ||
+          (animation.enabledInSequence !== undefined && !isBoolean(animation.enabledInSequence))
         ) {
           issues.push(`${label} animation ${animationIndex + 1} is invalid.`);
           valid = false;
@@ -424,7 +486,15 @@ function validateObject(
         }
         if (
           animation.type === "preset" &&
-          !["pulse", "bounce", "rotate", "violin-sway"].includes(String(animation.preset))
+          ![
+            "pulse",
+            "bounce",
+            "rotate",
+            "violin-sway",
+            "floating-hover",
+            "bow-swing",
+            "bow-stroke",
+          ].includes(String(animation.preset))
         ) {
           issues.push(`${label} preset animation ${animationIndex + 1} is unsupported.`);
           valid = false;
@@ -432,13 +502,20 @@ function validateObject(
       });
     }
   }
-  if (!validateInteractions(value.interactions, issues, label)) valid = false;
+  if (value.interactions !== undefined) {
+    if (!validateInteractions(value.interactions, issues, label)) valid = false;
+  }
   if (!validateTransform(value.transform, issues, label)) valid = false;
   return valid;
 }
 
-function validateLight(value: unknown, index: number, issues: string[]): value is SceneLight {
-  const label = `Light ${index + 1}`;
+function validateLight(
+  value: unknown,
+  index: number,
+  issues: string[],
+  prefix = "Light",
+): value is SceneLight {
+  const label = `${prefix} ${index + 1}`;
   if (!isRecord(value)) {
     issues.push(`${label} must be an object.`);
     return false;
@@ -629,6 +706,28 @@ export function validateSceneConfiguration(value: unknown): SceneConfiguration {
         issues.push(`Camera stop ${index + 1} position and target must be three-number vectors.`);
       }
     });
+  }
+
+  const cubeStudio = config.cubeStudio;
+  if (cubeStudio !== undefined) {
+    if (!isRecord(cubeStudio)) {
+      issues.push("Scene cubeStudio must be an object.");
+    } else {
+      if (!isBoolean(cubeStudio.enabled)) issues.push("cubeStudio enabled must be a boolean.");
+      if (!isFiniteNumber(cubeStudio.cubeSize) || cubeStudio.cubeSize <= 0) issues.push("cubeStudio cubeSize must be a positive number.");
+      if (cubeStudio.position !== undefined && !isVector(cubeStudio.position)) issues.push("cubeStudio position must be a three-number vector.");
+      if (!isColor(cubeStudio.interiorColor)) issues.push("cubeStudio interiorColor must be a #RRGGBB color.");
+      if (Array.isArray(cubeStudio.lights)) {
+        cubeStudio.lights.forEach((light, i) => validateLight(light, i, issues, "Cube Studio Light"));
+      }
+      if (cubeStudio.objects !== undefined) {
+        if (!Array.isArray(cubeStudio.objects)) {
+          issues.push("cubeStudio objects must be an array.");
+        } else {
+          cubeStudio.objects.forEach((object, i) => validateObject(object, i, issues, "Cube Studio Object"));
+        }
+      }
+    }
   }
 
   if (issues.length) throw new SceneConfigurationError(issues);

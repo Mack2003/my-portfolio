@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import FooterExtra from "@/components/layout/FooterExtra";
@@ -9,7 +10,6 @@ import HabitCatcher from "@/components/sections/HabitCatcher";
 import Hero from "@/components/sections/Hero";
 import ProjectExplorer from "@/components/sections/ProjectExplorer";
 import Skills from "@/components/sections/Skills";
-import ViolinCorner from "@/components/sections/ViolinCorner";
 import DividerAboutDesk from "@/components/dividers/DividerAboutDesk";
 import DividerHeroAbout from "@/components/dividers/DividerHeroAbout";
 import DividerPreFooter from "@/components/dividers/DividerPreFooter";
@@ -19,16 +19,17 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main className="w-full bg-surface min-h-[calc(100vh-80px)] pt-16">
+      <main className="w-full bg-surface min-h-[calc(100vh-80px)] pt-16 overflow-x-clip">
         <div className="flex flex-col w-full text-on-surface">
           <Hero />
           <DividerHeroAbout />
           <About />
           <DividerAboutDesk />
-          <DeskStage />
+          <Suspense fallback={null}>
+            <DeskStage />
+          </Suspense>
           <Skills />
           <ProjectExplorer />
-          <ViolinCorner />
           <HabitCatcher />
           <CvBanner />
           <DividerPreFooter />

@@ -23,6 +23,14 @@ export type SceneInteractionAction =
   | { type: "openUrl"; url: string; target?: "_self" | "_blank" }
   | { type: "showInformation"; title: string; content: string }
   | { type: "focusObject"; objectId?: string; duration?: number }
+  | {
+      type: "enterCubeView";
+      id?: string;
+      targetObjectId?: string;
+      duration?: number;
+      cameraDistance?: number;
+      cameraHeight?: number;
+    }
   | { type: "customAction"; name: string; payload?: Record<string, string | number | boolean> };
 
 export type SceneObjectInteractions = {
@@ -57,19 +65,27 @@ export type SceneObjectMaterial = {
   opacity: number;
   wireframe: boolean;
   side: "front" | "back" | "double";
+  preserveTextureAndColor?: boolean;
+  preserveOriginalTexture?: boolean;
+  selfGlow?: boolean;
+  emissiveMapFromBase?: boolean;
 };
 
 export type SceneObjectGlow = {
   enabled: boolean;
   color: string;
   intensity: number;
+  offsetY?: number;
 };
 
 export type SceneObjectPresetAnimation =
   | "pulse"
   | "bounce"
   | "rotate"
-  | "violin-sway";
+  | "violin-sway"
+  | "floating-hover"
+  | "bow-swing"
+  | "bow-stroke";
 
 export type SceneObjectAnimation = {
   id: string;
@@ -79,6 +95,8 @@ export type SceneObjectAnimation = {
   preset?: SceneObjectPresetAnimation;
   loop: boolean;
   timeScale: number;
+  duration?: number;
+  enabledInSequence?: boolean;
 };
 
 export type SceneObjectInstance = {
@@ -96,6 +114,7 @@ export type SceneObjectInstance = {
   glow?: SceneObjectGlow;
   animations?: SceneObjectAnimation[];
   defaultAnimationId?: string;
+  continueAllAnimationsInLoop?: boolean;
 };
 
 type SceneLightBase = {
@@ -168,6 +187,20 @@ export type SceneEnvironment = {
   pixelRatioCap: number;
 };
 
+export type CubeStudioConfiguration = {
+  enabled: boolean;
+  cubeSize: number;
+  position?: VectorTuple;
+  interiorColor: string;
+  roughness: number;
+  metalness: number;
+  cameraDistance: number;
+  cameraHeight: number;
+  transitionDuration: number;
+  lights: SceneLight[];
+  objects?: SceneObjectInstance[];
+};
+
 export type SceneConfiguration = {
   id: string;
   name: string;
@@ -177,4 +210,5 @@ export type SceneConfiguration = {
   lights: SceneLight[];
   environment: SceneEnvironment;
   cameraStops: SceneCameraStop[];
+  cubeStudio?: CubeStudioConfiguration;
 };

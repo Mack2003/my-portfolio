@@ -63,7 +63,7 @@ export default function HabitCatcher() {
           {"\n"}
           {/* Phaser Canvas Stage Simulation */}
           {"\n"}
-          <div className="relative w-full aspect-[21/9] min-h-[320px] bg-surface-container-lowest flex items-center justify-center overflow-hidden p-6">
+          <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] md:aspect-[21/9] min-h-[340px] bg-surface-container-lowest flex items-center justify-center overflow-hidden p-4 sm:p-6">
             {"\n"}
             {/* Falling Habit Items (Physics Representation) */}
             {"\n"}
@@ -107,7 +107,7 @@ export default function HabitCatcher() {
                 {"Control with arrow keys or touch swipes to catch productive habits while dodging distractions."}
               </p>
               {"\n"}
-              <button className="inline-flex items-center gap-space-xs font-label-code-lg text-label-code-lg bg-tertiary text-on-tertiary font-bold px-space-lg py-space-sm rounded-xl border-2 border-surface-container-lowest shadow-[4px_4px_0px_#080d22] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#080d22] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all uppercase tracking-wider" type="button">
+              <button className="inline-flex items-center gap-space-xs font-label-code-lg text-label-code-lg bg-tertiary text-on-tertiary font-bold px-space-lg py-space-sm rounded-xl border-2 border-surface-container-lowest shadow-[4px_4px_0px_#080d22] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#080d22] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all uppercase tracking-wider touch-manipulation min-h-[44px] cursor-pointer" type="button">
                 {"\n"}
                 <span>
                   {"Start Game [Enter]"}

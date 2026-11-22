@@ -1,37 +1,29 @@
 /* eslint-disable @next/next/no-img-element */
+import { portfolioData } from "@/data/portfolio";
 
 export default function About() {
   return (
     <>
     <section className="w-full bg-surface-container-low py-space-xl px-gutter-mobile lg:px-gutter relative" id="about">
-      {"\n"}
       <div className="max-w-[1280px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-        {"\n"}
         {/* Left Column: Organic blob frame portrait with sticker callouts */}
-        {"\n"}
         <div
           aria-label="Malay's portrait with an interactive UFO spotlight"
           className="about-ufo-scene lg:col-span-5 flex justify-center relative"
           role="group"
           tabIndex={0}
         >
-          {"\n"}
           {/* Sticker 1: Creative Coder */}
-          {"\n"}
           <div className="absolute -top-4 -left-2 z-20 bg-secondary text-on-secondary-container font-label-code-sm text-label-code-sm px-space-md py-space-xs rounded-lg border-2 border-surface-container-lowest shadow-[3px_3px_0px_#080d22] -rotate-6 hover:rotate-0 transition-transform">
-            {"\n          Creative Coder 🚀\n        "}
+            Creative Coder 🚀
           </div>
-          {"\n"}
           {/* Sticker 2: Problem Solver */}
-          {"\n"}
-          <div className="absolute bottom-6 -left-6 z-20 bg-primary-container text-on-primary-fixed font-label-code-sm text-label-code-sm px-space-md py-space-xs rounded-lg border-2 border-surface-container-lowest shadow-[3px_3px_0px_#080d22] rotate-3 hover:rotate-0 transition-transform">
-            {"\n          Problem Solver ⚡\n        "}
+          <div className="absolute bottom-6 -left-2 sm:-left-6 z-20 bg-primary-container text-on-primary-fixed font-label-code-sm text-label-code-sm px-space-md py-space-xs rounded-lg border-2 border-surface-container-lowest shadow-[3px_3px_0px_#080d22] rotate-3 hover:rotate-0 transition-transform">
+            Problem Solver ⚡
           </div>
-          {"\n"}
-          {/* Sticker 3: Violinist */}
-          {"\n"}
-          <div className="absolute top-1/2 -right-6 z-20 bg-tertiary-fixed text-on-tertiary-fixed font-label-code-sm text-label-code-sm px-space-md py-space-xs rounded-lg border-2 border-surface-container-lowest shadow-[3px_3px_0px_#080d22] rotate-6 hover:rotate-0 transition-transform">
-            {"\n          Violinist 🎻\n        "}
+          {/* Sticker 3: React Native */}
+          <div className="absolute top-1/2 -right-2 sm:-right-6 z-20 bg-tertiary-fixed text-on-tertiary-fixed font-label-code-sm text-label-code-sm px-space-md py-space-xs rounded-lg border-2 border-surface-container-lowest shadow-[3px_3px_0px_#080d22] rotate-6 hover:rotate-0 transition-transform">
+            React Native 📱
           </div>
           {"\n"}
           <div className="portrait-frame relative w-72 h-72 sm:w-80 sm:h-80">
@@ -112,115 +104,84 @@ export default function About() {
             <div className="inline-block relative mb-2">
               {"\n"}
               <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface">
-                {"About Me"}
+                About Me
               </h2>
-              {"\n"}
               <div className="h-2 w-full bg-secondary-container rounded-full mt-1"></div>
-              {"\n"}
             </div>
-            {"\n"}
             <p className="font-body-lg text-body-lg text-on-surface mt-4 leading-relaxed">
-              {"\n            I engineer interfaces where "}
-              <strong className="text-tertiary">
-                {"precision engineering"}
-              </strong>
-              {" meets boundless curiosity. When I'm not orchestrating cloud pipelines or building React Native apps, you'll find me practicing violin concertos or crafting physics-driven browser games.\n          "}
+              {portfolioData.personal.bioIntro}
             </p>
-            {"\n"}
           </div>
-          {"\n"}
+
           {/* Quick Facts Tickets in solid night-700 / surface-container */}
-          {"\n"}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md pt-2">
-            {"\n"}
-            {/* Fact 1 */}
-            {"\n"}
+            {/* Fact 1: Confirmed Location */}
             <div className="bg-surface-container p-space-md rounded-xl border-2 border-surface-variant shadow-[4px_4px_0px_#080d22] flex items-start gap-space-sm hover:border-primary transition-colors">
-              {"\n"}
               <span className="material-symbols-outlined text-primary text-2xl mt-0.5">
-                {"location_on"}
+                location_on
               </span>
-              {"\n"}
               <div className="min-w-0">
-                {"\n"}
                 <span className="font-label-code-sm text-label-code-sm text-on-surface-variant uppercase tracking-wider block">
-                  {"Base / Relocation"}
+                  Location
                 </span>
-                {"\n"}
                 <p className="font-headline-sm text-headline-sm text-on-surface">
-                  {"San Francisco / Remote"}
+                  {portfolioData.personal.location}
                 </p>
-                {"\n"}
               </div>
-              {"\n"}
             </div>
-            {"\n"}
-            {/* Fact 2 */}
-            {"\n"}
+
+            {/* Fact 2: Confirmed Professional Experience */}
             <div className="bg-surface-container p-space-md rounded-xl border-2 border-surface-variant shadow-[4px_4px_0px_#080d22] flex items-start gap-space-sm hover:border-tertiary transition-colors">
-              {"\n"}
               <span className="material-symbols-outlined text-tertiary text-2xl mt-0.5">
-                {"military_tech"}
+                work
               </span>
-              {"\n"}
               <div className="min-w-0">
-                {"\n"}
                 <span className="font-label-code-sm text-label-code-sm text-on-surface-variant uppercase tracking-wider block">
-                  {"Experience"}
+                  Experience
                 </span>
-                {"\n"}
                 <p className="font-headline-sm text-headline-sm text-on-surface">
-                  {"5+ Years Full-Stack"}
+                  {portfolioData.experience.yearsBadge}
                 </p>
-                {"\n"}
+                <p className="font-label-code-sm text-xs text-on-surface-variant mt-0.5">
+                  Websadroit &amp; Birdvision AB
+                </p>
               </div>
-              {"\n"}
             </div>
-            {"\n"}
-            {/* Fact 3 */}
-            {"\n"}
+
+            {/* Fact 3: Core Stack */}
             <div className="bg-surface-container p-space-md rounded-xl border-2 border-surface-variant shadow-[4px_4px_0px_#080d22] flex items-start gap-space-sm hover:border-secondary transition-colors">
-              {"\n"}
               <span className="material-symbols-outlined text-secondary text-2xl mt-0.5">
-                {"deployed_code"}
+                layers
               </span>
-              {"\n"}
               <div className="min-w-0">
-                {"\n"}
                 <span className="font-label-code-sm text-label-code-sm text-on-surface-variant uppercase tracking-wider block">
-                  {"Core Architecture"}
+                  Core Technologies
                 </span>
-                {"\n"}
                 <p className="font-body-md text-body-md text-on-surface font-bold">
-                  {"Next.js, AWS S3/Edge, WebGL"}
+                  React Native, Next.js, Node.js
                 </p>
-                {"\n"}
+                <p className="font-label-code-sm text-xs text-on-surface-variant mt-0.5">
+                  PostgreSQL, Redis, TypeScript
+                </p>
               </div>
-              {"\n"}
             </div>
-            {"\n"}
-            {/* Fact 4 */}
-            {"\n"}
+
+            {/* Fact 4: Primary Focus */}
             <div className="bg-surface-container p-space-md rounded-xl border-2 border-surface-variant shadow-[4px_4px_0px_#080d22] flex items-start gap-space-sm hover:border-primary-fixed-dim transition-colors">
-              {"\n"}
               <span className="material-symbols-outlined text-primary-fixed-dim text-2xl mt-0.5">
-                {"sports_esports"}
+                rocket_launch
               </span>
-              {"\n"}
               <div className="min-w-0">
-                {"\n"}
                 <span className="font-label-code-sm text-label-code-sm text-on-surface-variant uppercase tracking-wider block">
-                  {"Current Obsession"}
+                  Primary Focus
                 </span>
-                {"\n"}
                 <p className="font-body-md text-body-md text-on-surface font-bold">
-                  {"Phaser 3 "}
-                  {"&"}
-                  {" Web Audio DSP"}
+                  Native Mobile &amp; Scalable Web
                 </p>
-                {"\n"}
+                <p className="font-label-code-sm text-xs text-on-surface-variant mt-0.5">
+                  Full-Stack Architecture &amp; 3D Graphics
+                </p>
               </div>
-              {"\n"}
             </div>
             {"\n"}
           </div>

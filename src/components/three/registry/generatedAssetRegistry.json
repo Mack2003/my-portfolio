@@ -1,5 +1,14 @@
 [
   {
+    "id": "appearance-effect-light-beam",
+    "displayName": "Appearance Effect Light Beam",
+    "path": "/models/appearance_effect_light_beam.glb",
+    "relativePath": "appearance_effect_light_beam.glb",
+    "format": "glb",
+    "contentHash": "ce9b310cb92897e651196943932bb119e0f4ae03906ed80ba7b2752490e246e4",
+    "metadata": {}
+  },
+  {
     "id": "delux-book-helf",
     "displayName": "Deluxe Bookshelf",
     "path": "/models/delux_book_helf.glb",
@@ -39,6 +48,15 @@
     "defaultWidth": 9
   },
   {
+    "id": "firebase-logo",
+    "displayName": "Firebase Logo",
+    "path": "/models/firebase_logo.glb",
+    "relativePath": "firebase_logo.glb",
+    "format": "glb",
+    "contentHash": "a47065a4610b9d08277891c80300bd6be3c3e1d772737680cfb9f488e3d9ad17",
+    "metadata": {}
+  },
+  {
     "id": "laptop",
     "displayName": "Laptop",
     "path": "/models/laptop.glb",
@@ -50,6 +68,15 @@
       "defaultWidth": 1
     },
     "defaultWidth": 1
+  },
+  {
+    "id": "mongodb-logo-3d-model",
+    "displayName": "Mongodb Logo 3d Model",
+    "path": "/models/mongodb_logo__3d_model.glb",
+    "relativePath": "mongodb_logo__3d_model.glb",
+    "format": "glb",
+    "contentHash": "afd11f1d0130b5d6d98e1c6a09fb90e9828c4eddc986cf7e56adfeeeff8c0a4f",
+    "metadata": {}
   },
   {
     "id": "office-chair",
@@ -76,6 +103,15 @@
       "defaultWidth": 0.7
     },
     "defaultWidth": 0.7
+  },
+  {
+    "id": "round-platform",
+    "displayName": "Round Platform",
+    "path": "/models/round_platform.glb",
+    "relativePath": "round_platform.glb",
+    "format": "glb",
+    "contentHash": "ad6745af05703909125a97394dc6fa1af3cf3afa617b0085f33296af9e09e955",
+    "metadata": {}
   },
   {
     "id": "skills-icons-android-bug",

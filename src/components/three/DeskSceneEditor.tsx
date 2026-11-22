@@ -1,14 +1,15 @@
 "use client";
 
 import { TransformControls } from "@react-three/drei";
-import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
-import type { Group } from "three";
+import { DoubleSide, Group, Quaternion, Vector3 } from "three";
 import {
   parseSceneConfiguration,
   serializeSceneConfiguration,
 } from "./config/sceneSerialization";
 import type {
+  CubeStudioConfiguration,
   SceneCameraStop,
   SceneConfiguration,
   SceneLight,
@@ -18,27 +19,43 @@ import type {
   SceneInteractionAction,
   ScenePrimitiveType,
   SceneObjectAnimation,
+  SceneObjectPresetAnimation,
 } from "./config/sceneTypes";
+import { PRESET_ANIMATION_OPTIONS } from "./animations";
 import { assetRegistry } from "./registry/assetRegistry";
 import type { VectorTuple, TransformMode } from "./deskSceneLayout";
 
-type EditorTab = "objects" | "lights" | "environment" | "camera" | "configuration";
+export type EditorTab = "objects" | "lights" | "environment" | "camera" | "configuration";
 type TransformSpace = "world" | "local";
 type LightType = SceneLight["type"];
 
 const presetsKey = "malay-portfolio-scene-presets-v1";
+const defaultCubeStudio: CubeStudioConfiguration = {
+  enabled: true,
+  cubeSize: 36,
+  position: [0, 80, 0],
+  interiorColor: "#050508",
+  roughness: 0.95,
+  metalness: 0.05,
+  cameraDistance: 3.8,
+  cameraHeight: 1.2,
+  transitionDuration: 2.2,
+  lights: [],
+  objects: [],
+};
 const panelClass =
-  "rounded-xl border-2 border-surface-variant bg-surface-container-lowest p-3 text-on-surface shadow-[4px_4px_0px_#080d22]";
+  "rounded-xl border-2 border-surface-variant bg-surface-container-lowest p-3 sm:p-4 text-on-surface shadow-[4px_4px_0px_#080d22] box-border";
 const inputClass =
-  "w-full rounded-md border border-outline-variant bg-surface-container-low px-2 py-2 text-on-surface";
+  "w-full min-w-0 rounded-md border border-outline-variant bg-surface-container-low px-2 py-1.5 text-xs text-on-surface focus:border-primary focus:outline-none transition-colors";
 const buttonClass =
-  "rounded-md border border-outline-variant bg-surface-container-low px-2 py-2 hover:bg-surface-container-high focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
+  "rounded-md border border-outline-variant bg-surface-container-low px-2 py-1.5 text-xs hover:bg-surface-container-high focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary transition-colors cursor-pointer";
 
+let idCounter = 0;
 function uniqueId(prefix: string) {
   const suffix =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      : `${Date.now()}-${++idCounter}`;
   return `${prefix}-${suffix}`;
 }
 
@@ -122,6 +139,8 @@ function newInteractionAction(type: SceneInteractionAction["type"]): SceneIntera
       return { type, title: "Information", content: "" };
     case "focusObject":
       return { type, duration: 1.5 };
+    case "enterCubeView":
+      return { type, duration: 1.5, cameraDistance: 3.8, cameraHeight: 1.2 };
     case "customAction":
       return { type, name: "" };
   }
@@ -157,6 +176,229 @@ export function SceneTransformGizmo({
   );
 }
 
+function LightDirectionArrow({
+  start,
+  end,
+  color = "#ffd700",
+}: {
+  start: VectorTuple;
+  end: VectorTuple;
+  color?: string;
+}) {
+  const p1 = new Vector3(...start);
+  const p2 = new Vector3(...end);
+  const dir = new Vector3().subVectors(p2, p1);
+  const len = dir.length();
+  if (len < 0.05) return null;
+
+  const unitDir = dir.clone().normalize();
+  const quat = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), unitDir);
+  const headLength = Math.min(0.35, len * 0.35);
+  const shaftLength = Math.max(0.01, len - headLength);
+  const shaftPos = p1.clone().add(unitDir.clone().multiplyScalar(shaftLength / 2));
+  const headPos = p1.clone().add(unitDir.clone().multiplyScalar(shaftLength + headLength / 2));
+
+  return (
+    <group>
+      <mesh position={shaftPos} quaternion={quat}>
+        <cylinderGeometry args={[0.02, 0.02, shaftLength, 8]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+      <mesh position={headPos} quaternion={quat}>
+        <coneGeometry args={[0.08, headLength, 12]} />
+        <meshBasicMaterial color={color} />
+      </mesh>
+    </group>
+  );
+}
+
+export function SceneLightGizmo({
+  active,
+  light,
+  mode = "translate",
+  space = "world",
+  snapEnabled = false,
+  lightTargetMode = "position",
+  onCommitPosition,
+  onCommitTarget,
+  onCommitRotation,
+  inCubeStudio = false,
+  cubeStudioPosition = [0, 80, 0],
+}: {
+  active: boolean;
+  light?: SceneLight | null;
+  mode?: TransformMode;
+  space?: TransformSpace;
+  snapEnabled?: boolean;
+  lightTargetMode?: "position" | "target";
+  onCommitPosition?: (newPosition: VectorTuple) => void;
+  onCommitTarget?: (newTarget: VectorTuple) => void;
+  onCommitRotation?: (newRotation: VectorTuple) => void;
+  inCubeStudio?: boolean;
+  cubeStudioPosition?: VectorTuple;
+}) {
+  const [anchorNode, setAnchorNode] = useState<Group | null>(null);
+  const posGroupRef = useRef<Group | null>(null);
+  const targetGroupRef = useRef<Group | null>(null);
+  const isDragging = useRef(false);
+
+  const hasPosition = Boolean(light && "position" in light);
+  const hasTarget = Boolean(light && "target" in light);
+  const position = hasPosition && light && "position" in light ? light.position : null;
+  const target = hasTarget && light && "target" in light ? light.target : null;
+
+  const [dragPos, setDragPos] = useState<VectorTuple | null>(null);
+  const [dragTarget, setDragTarget] = useState<VectorTuple | null>(null);
+
+  const currentPos = dragPos ?? position ?? [0, 0, 0];
+  const currentTarget = dragTarget ?? target ?? [0, 0, 0];
+
+  useEffect(() => {
+    if (!light || !hasPosition || isDragging.current) return;
+    if (posGroupRef.current && "position" in light) {
+      posGroupRef.current.position.set(...light.position);
+      if (light.type === "rectArea") {
+        posGroupRef.current.rotation.set(
+          (light.rotation[0] * Math.PI) / 180,
+          (light.rotation[1] * Math.PI) / 180,
+          (light.rotation[2] * Math.PI) / 180,
+        );
+      }
+    }
+    if (targetGroupRef.current && "target" in light) {
+      targetGroupRef.current.position.set(...light.target);
+    }
+  }, [light, hasPosition]);
+
+  useEffect(() => {
+    if (lightTargetMode === "target" && hasTarget) {
+      setAnchorNode(targetGroupRef.current);
+    } else {
+      setAnchorNode(posGroupRef.current);
+    }
+  }, [lightTargetMode, hasTarget, light?.id]);
+
+  if (!active || !light || !position) return null;
+
+  const handleCommit = () => {
+    isDragging.current = false;
+    setDragPos(null);
+    setDragTarget(null);
+    if (lightTargetMode === "target" && hasTarget && targetGroupRef.current) {
+      const p = targetGroupRef.current.position;
+      onCommitTarget?.([p.x, p.y, p.z]);
+    } else if (posGroupRef.current) {
+      const p = posGroupRef.current.position;
+      onCommitPosition?.([p.x, p.y, p.z]);
+      if (light.type === "rectArea" && mode === "rotate") {
+        const r = posGroupRef.current.rotation;
+        onCommitRotation?.([
+          (r.x * 180) / Math.PI,
+          (r.y * 180) / Math.PI,
+          (r.z * 180) / Math.PI,
+        ]);
+      }
+    }
+  };
+
+  const lightColor = light.color || "#ffea00";
+
+  return (
+    <group position={inCubeStudio ? cubeStudioPosition : [0, 0, 0]}>
+      {/* Light Position Anchor */}
+      <group
+        position={position}
+        ref={(node) => {
+          posGroupRef.current = node;
+          if (lightTargetMode !== "target" && node && anchorNode !== node) {
+            setAnchorNode(node);
+          }
+        }}
+      >
+        {/* Glowing bulb icon marker */}
+        <mesh>
+          <sphereGeometry args={[0.18, 16, 16]} />
+          <meshBasicMaterial color={lightColor} wireframe />
+        </mesh>
+        <mesh>
+          <sphereGeometry args={[0.08, 12, 12]} />
+          <meshBasicMaterial color={lightColor} />
+        </mesh>
+
+        {/* Omnidirectional radiating indicator for point lights */}
+        {light.type === "point" && <axesHelper args={[0.4]} />}
+
+        {/* Rect area light planar indicator */}
+        {light.type === "rectArea" && (
+          <group>
+            <mesh>
+              <planeGeometry args={[light.width, light.height]} />
+              <meshBasicMaterial color={lightColor} side={DoubleSide} wireframe />
+            </mesh>
+          </group>
+        )}
+      </group>
+
+      {/* Target Anchor (for directional and spot lights) */}
+      {hasTarget && target && (
+        <group
+          position={target}
+          ref={(node) => {
+            targetGroupRef.current = node;
+            if (lightTargetMode === "target" && node && anchorNode !== node) {
+              setAnchorNode(node);
+            }
+          }}
+        >
+          {/* Target marker ring & crosshair */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.15, 0.22, 24]} />
+            <meshBasicMaterial color={lightColor} side={DoubleSide} />
+          </mesh>
+          <mesh>
+            <sphereGeometry args={[0.06, 8, 8]} />
+            <meshBasicMaterial color={lightColor} />
+          </mesh>
+        </group>
+      )}
+
+      {/* 3D Directional Indicator Arrow pointing from light position to target */}
+      {hasTarget && (
+        <LightDirectionArrow
+          start={currentPos}
+          end={currentTarget}
+          color={lightColor}
+        />
+      )}
+
+      {/* TransformControls: 3D Indicator Arrows attached to selected target (Position or Direction Target) */}
+      {anchorNode && (
+        <TransformControls
+          mode={light.type === "rectArea" ? mode : "translate"}
+          object={anchorNode}
+          onMouseDown={() => {
+            isDragging.current = true;
+          }}
+          onObjectChange={() => {
+            if (lightTargetMode === "target" && targetGroupRef.current) {
+              const p = targetGroupRef.current.position;
+              setDragTarget([p.x, p.y, p.z]);
+            } else if (posGroupRef.current) {
+              const p = posGroupRef.current.position;
+              setDragPos([p.x, p.y, p.z]);
+            }
+          }}
+          onMouseUp={handleCommit}
+          rotationSnap={snapEnabled ? Math.PI / 12 : undefined}
+          size={0.75}
+          space={space}
+          translationSnap={snapEnabled ? 0.1 : undefined}
+        />
+      )}
+    </group>
+  );
+}
+
 export function DeskSceneEditor({
   open,
   onOpenChange,
@@ -173,6 +415,7 @@ export function DeskSceneEditor({
   onPlacementChange,
   onCameraStopChange,
   onResetSelected,
+  onDeleteObject,
   onResetAll,
   onUndo,
   onRedo,
@@ -181,6 +424,17 @@ export function DeskSceneEditor({
   expanded,
   onExpandedChange,
   embeddedAnimations,
+  cubeStudioActive = false,
+  onToggleCubeStudio,
+  cubeStudioTargetId,
+  tab: tabProp,
+  onTabChange,
+  selectedLight: selectedLightProp,
+  onSelectedLightChange,
+  lightTargetMode = "position",
+  onLightTargetModeChange,
+  isStageVisible = true,
+  isMobilePortrait = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -199,6 +453,7 @@ export function DeskSceneEditor({
   onPlacementChange: (id: string, transform: SceneObjectTransform) => void;
   onCameraStopChange: (index: number, stop: SceneCameraStop) => void;
   onResetSelected: (id: string) => void;
+  onDeleteObject?: (id: string) => void;
   onResetAll: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -207,17 +462,61 @@ export function DeskSceneEditor({
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   embeddedAnimations: Record<string, string[]>;
+  cubeStudioActive?: boolean;
+  onToggleCubeStudio?: () => void;
+  cubeStudioTargetId?: string | null;
+  tab?: EditorTab;
+  onTabChange?: (tab: EditorTab) => void;
+  selectedLight?: string;
+  onSelectedLightChange?: (id: string) => void;
+  lightTargetMode?: "position" | "target";
+  onLightTargetModeChange?: (mode: "position" | "target") => void;
+  isStageVisible?: boolean;
+  isMobilePortrait?: boolean;
 }) {
-  const [tab, setTab] = useState<EditorTab>("objects");
+  const [localTab, setLocalTab] = useState<EditorTab>("objects");
+  const [showOrientationWarning, setShowOrientationWarning] = useState(false);
+
+  const handleEditClick = () => {
+    if (!open && isMobilePortrait) {
+      setShowOrientationWarning(true);
+      setTimeout(() => setShowOrientationWarning(false), 5000);
+      return;
+    }
+    onOpenChange(!open);
+  };
+  const tab = tabProp ?? localTab;
+  const setTab = (nextTab: EditorTab) => {
+    setLocalTab(nextTab);
+    onTabChange?.(nextTab);
+  };
   const [search, setSearch] = useState("");
   const [assetSearch, setAssetSearch] = useState("");
   const [assetToAdd, setAssetToAdd] = useState("");
   const [lightTypeToAdd, setLightTypeToAdd] = useState<LightType>("point");
-  const [selectedLight, setSelectedLight] = useState(configuration.lights[0]?.id ?? "");
+  const [localSelectedLight, setLocalSelectedLight] = useState(
+    configuration.lights[0]?.id ?? "",
+  );
+  const selectedLight = selectedLightProp ?? localSelectedLight;
+  const setSelectedLight = useCallback((id: string) => {
+    setLocalSelectedLight(id);
+    onSelectedLightChange?.(id);
+  }, [onSelectedLightChange]);
   const [selectedCamera, setSelectedCamera] = useState(0);
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [nameDrafts, setNameDrafts] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
+  const [toast, setToast] = useState<{ message: string; type?: "success" | "info" | "error" } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string, type: "success" | "info" | "error" = "success") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message: msg, type });
+    toastTimer.current = setTimeout(() => {
+      setToast(null);
+      toastTimer.current = null;
+    }, 3200);
+  }, []);
   const [importText, setImportText] = useState("");
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
@@ -226,23 +525,74 @@ export function DeskSceneEditor({
   const [primitiveType, setPrimitiveType] = useState<ScenePrimitiveType>("box");
   const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
   const dragStart = useRef<{ x: number; y: number; panelX: number; panelY: number } | null>(null);
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("malay-scene-editor-width");
+        if (saved) {
+          const val = parseInt(saved, 10);
+          if (!isNaN(val) && val >= 320 && val <= 850) return val;
+        }
+        return Math.min(460, Math.max(320, window.innerWidth - 32));
+      } catch {
+        return 460;
+      }
+    }
+    return 460;
+  });
+  const widthResizeStart = useRef<{ clientX: number; initialWidth: number } | null>(null);
+  const [preserveTextureOption, setPreserveTextureOption] = useState(false);
+
+  const activeObjectsList = cubeStudioActive
+    ? [
+        ...((cubeStudioTargetId || (selected && selected !== "room")) &&
+        !(configuration.cubeStudio?.objects ?? []).some(
+          (o) => o.id === (cubeStudioTargetId || selected),
+        )
+          ? configuration.objects.filter((o) => o.id === (cubeStudioTargetId || selected))
+          : []),
+        ...(configuration.cubeStudio?.objects ?? []),
+      ]
+    : configuration.objects;
+  const activeLightsList = cubeStudioActive
+    ? (configuration.cubeStudio?.lights ?? [])
+    : configuration.lights;
 
   const selectedObject =
-    configuration.objects.find((object) => object.id === selected && object.id !== "room") ??
-    configuration.objects.find((object) => object.id !== "room");
-  const filteredObjects = configuration.objects.filter((object) =>
+    activeObjectsList.find((object) => object.id === selected && object.id !== "room") ??
+    activeObjectsList.find((object) => object.id !== "room") ??
+    activeObjectsList[0];
+  const filteredObjects = activeObjectsList.filter((object) =>
     object.id !== "room" &&
     `${object.name} ${object.assetId}`.toLowerCase().includes(search.toLowerCase()),
   );
-  const filteredLights = configuration.lights.filter((light) =>
+  const filteredLights = activeLightsList.filter((light) =>
     `${light.name} ${light.type}`.toLowerCase().includes(search.toLowerCase()),
   );
   const selectedAsset = selectedObject
     ? assetRegistry.find((asset) => asset.id === selectedObject.assetId)
     : undefined;
   const selectedLightItem =
-    configuration.lights.find((light) => light.id === selectedLight) ??
-    configuration.lights[0];
+    activeLightsList.find((light) => light.id === selectedLight) ??
+    activeLightsList[0];
+
+  const handleToggleScene = useCallback(() => {
+    if (!onToggleCubeStudio) return;
+    if (cubeStudioActive) {
+      const firstDesk = configuration.objects.find((o) => o.id !== "room");
+      if (firstDesk) onSelectedChange(firstDesk.id);
+      if (configuration.lights[0]) setSelectedLight(configuration.lights[0].id);
+    } else {
+      const targetId =
+        selected && selected !== "room"
+          ? selected
+          : configuration.cubeStudio?.objects?.[0]?.id;
+      if (targetId) onSelectedChange(targetId);
+      const firstCubeLight = configuration.cubeStudio?.lights?.[0];
+      if (firstCubeLight) setSelectedLight(firstCubeLight.id);
+    }
+    onToggleCubeStudio();
+  }, [cubeStudioActive, selected, configuration.objects, configuration.lights, configuration.cubeStudio?.objects, configuration.cubeStudio?.lights, onSelectedChange, onToggleCubeStudio, setSelectedLight]);
 
   function loadSavedPresets() {
     try {
@@ -340,6 +690,14 @@ export function DeskSceneEditor({
             <label>Duration (seconds)<input className={inputClass} min={0.1} step={0.1} type="number" value={action.duration ?? 1.5} onChange={(event) => onChange({ ...action, duration: Number(event.target.value) })} /></label>
           </div>
         )}
+        {action.type === "enterCubeView" && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>Target object ID<input className={inputClass} placeholder="(Current object)" value={action.targetObjectId ?? ""} onChange={(event) => onChange({ ...action, targetObjectId: event.target.value || undefined })} /></label>
+            <label>Transition duration (s)<input className={inputClass} min={0.2} step={0.1} type="number" value={action.duration ?? 1.5} onChange={(event) => onChange({ ...action, duration: Number(event.target.value) })} /></label>
+            <label>Camera distance<input className={inputClass} min={1} step={0.5} type="number" value={action.cameraDistance ?? 3.8} onChange={(event) => onChange({ ...action, cameraDistance: Number(event.target.value) })} /></label>
+            <label>Camera height<input className={inputClass} step={0.2} type="number" value={action.cameraHeight ?? 1.2} onChange={(event) => onChange({ ...action, cameraHeight: Number(event.target.value) })} /></label>
+          </div>
+        )}
         {action.type === "customAction" && (
           <label>Controlled action name<input className={inputClass} value={action.name} onChange={(event) => onChange({ ...action, name: event.target.value })} /></label>
         )}
@@ -348,10 +706,46 @@ export function DeskSceneEditor({
   }
 
   function updateObject(id: string, update: (object: SceneObjectInstance) => SceneObjectInstance) {
-    onConfigurationChange((current) => ({
-      ...current,
-      objects: current.objects.map((object) => (object.id === id ? update(object) : object)),
-    }));
+    onConfigurationChange((current) => {
+      if (cubeStudioActive) {
+        const cubeObjs = current.cubeStudio?.objects ?? [];
+        const inCube = cubeObjs.some((object) => object.id === id);
+        if (inCube) {
+          return {
+            ...current,
+            cubeStudio: {
+              ...(current.cubeStudio ?? defaultCubeStudio),
+              objects: cubeObjs.map((object) =>
+                object.id === id ? update(object) : object,
+              ),
+            },
+          };
+        }
+        const deskObj = current.objects.find((object) => object.id === id);
+        if (deskObj) {
+          const newCubeObj = update({
+            ...deskObj,
+            transform: {
+              position: [0, 0, 0],
+              rotation: [0, 0, 0],
+              scale: [...deskObj.transform.scale] as VectorTuple,
+            },
+          });
+          return {
+            ...current,
+            cubeStudio: {
+              ...(current.cubeStudio ?? defaultCubeStudio),
+              objects: [newCubeObj, ...cubeObjs],
+            },
+          };
+        }
+        return current;
+      }
+      return {
+        ...current,
+        objects: current.objects.map((object) => (object.id === id ? update(object) : object)),
+      };
+    });
   }
 
   function startPanelDrag(event: ReactPointerEvent<HTMLDivElement>) {
@@ -376,6 +770,29 @@ export function DeskSceneEditor({
     dragStart.current = null;
   }
 
+  function startWidthResize(event: ReactPointerEvent<HTMLDivElement>) {
+    widthResizeStart.current = {
+      clientX: event.clientX,
+      initialWidth: panelWidth,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveWidthResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!widthResizeStart.current) return;
+    const maxAllowed = Math.min(820, window.innerWidth - 24);
+    const delta = widthResizeStart.current.clientX - event.clientX;
+    const newWidth = Math.max(320, Math.min(widthResizeStart.current.initialWidth + delta, maxAllowed));
+    setPanelWidth(newWidth);
+    try {
+      localStorage.setItem("malay-scene-editor-width", String(newWidth));
+    } catch {}
+  }
+
+  function endWidthResize() {
+    widthResizeStart.current = null;
+  }
+
   useEffect(() => {
     if (!expanded) return;
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -396,10 +813,23 @@ export function DeskSceneEditor({
   }
 
   function updateLight(id: string, update: (light: SceneLight) => SceneLight) {
-    onConfigurationChange((current) => ({
-      ...current,
-      lights: current.lights.map((light) => (light.id === id ? update(light) : light)),
-    }));
+    onConfigurationChange((current) => {
+      if (cubeStudioActive) {
+        return {
+          ...current,
+          cubeStudio: {
+            ...(current.cubeStudio ?? defaultCubeStudio),
+            lights: (current.cubeStudio?.lights ?? []).map((light) =>
+              light.id === id ? update(light) : light,
+            ),
+          },
+        };
+      }
+      return {
+        ...current,
+        lights: current.lights.map((light) => (light.id === id ? update(light) : light)),
+      };
+    });
   }
 
   function updateAxis(field: keyof SceneObjectTransform, axis: number, value: string) {
@@ -443,18 +873,28 @@ export function DeskSceneEditor({
       name: asset.displayName,
       enabled: true,
       visible: true,
-      castShadow: false,
-      receiveShadow: false,
+      castShadow: true,
+      receiveShadow: true,
       interactions: { enabled: false, trigger: "click", actions: [] },
       transform: {
-        position: [source[0] + 0.4, source[1], source[2]],
+        position: cubeStudioActive ? [0, 0, 0] : [source[0] + 0.4, source[1], source[2]],
         rotation: [0, 0, 0],
         scale: [1, 1, 1],
       },
     };
-    onConfigurationChange((current) => ({ ...current, objects: [...current.objects, object] }));
+    if (cubeStudioActive) {
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: {
+          ...(current.cubeStudio ?? defaultCubeStudio),
+          objects: [...(current.cubeStudio?.objects ?? []), object],
+        },
+      }));
+    } else {
+      onConfigurationChange((current) => ({ ...current, objects: [...current.objects, object] }));
+    }
     onSelectedChange(object.id);
-    setMessage(`Added ${asset.displayName}.`);
+    setMessage(`Added ${asset.displayName} to ${cubeStudioActive ? "Cube View" : "Desk Scene"}.`);
   }
 
   function addPrimitive() {
@@ -479,7 +919,7 @@ export function DeskSceneEditor({
       castShadow: false,
       receiveShadow: false,
       transform: {
-        position: [source[0] + 0.4, source[1], source[2]],
+        position: cubeStudioActive ? [0, 0, 0] : [source[0] + 0.4, source[1], source[2]],
         rotation: [0, 0, 0],
         scale: [1, 1, 1],
       },
@@ -502,19 +942,30 @@ export function DeskSceneEditor({
         enabled: false,
         color: "#ffffff",
         intensity: 0,
+        offsetY: 0,
       },
       interactions: { enabled: false, trigger: "click", actions: [] },
     };
-    onConfigurationChange((current) => ({ ...current, objects: [...current.objects, object] }));
+    if (cubeStudioActive) {
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: {
+          ...(current.cubeStudio ?? defaultCubeStudio),
+          objects: [...(current.cubeStudio?.objects ?? []), object],
+        },
+      }));
+    } else {
+      onConfigurationChange((current) => ({ ...current, objects: [...current.objects, object] }));
+    }
     onSelectedChange(object.id);
-    setMessage(`Added ${primitiveType} primitive.`);
+    setMessage(`Added ${primitiveType} primitive to ${cubeStudioActive ? "Cube View" : "Desk Scene"}.`);
   }
 
   function duplicateObject() {
     if (!selectedObject) return;
     const duplicate: SceneObjectInstance = {
       ...structuredClone(selectedObject),
-      id: uniqueId(selectedObject.assetId),
+      id: uniqueId(selectedObject.assetId || "object"),
       name: `${selectedObject.name} copy`,
       transform: {
         ...selectedObject.transform,
@@ -525,43 +976,116 @@ export function DeskSceneEditor({
         ],
       },
     };
-    onConfigurationChange((current) => ({
-      ...current,
-      objects: [...current.objects, duplicate],
-    }));
+    if (cubeStudioActive) {
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: {
+          ...(current.cubeStudio ?? defaultCubeStudio),
+          objects: [...(current.cubeStudio?.objects ?? []), duplicate],
+        },
+      }));
+    } else {
+      onConfigurationChange((current) => ({
+        ...current,
+        objects: [...current.objects, duplicate],
+      }));
+    }
     onSelectedChange(duplicate.id);
     setMessage(`Duplicated ${selectedObject.name}.`);
   }
 
+  function deleteTargetObject(targetId: string) {
+    if (targetId === "room") return;
+    const target = activeObjectsList.find((object) => object.id === targetId);
+    const name = target?.name ?? targetId;
+    if (onDeleteObject) {
+      onDeleteObject(targetId);
+    } else if (cubeStudioActive) {
+      const remaining = (configuration.cubeStudio?.objects ?? []).filter(
+        (object) => object.id !== targetId,
+      );
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: current.cubeStudio
+          ? { ...current.cubeStudio, objects: remaining }
+          : undefined,
+      }));
+      if (selected === targetId || selectedObject?.id === targetId) {
+        onSelectedChange(remaining[0]?.id ?? "");
+      }
+    } else {
+      const remaining = configuration.objects.filter(
+        (object) => object.id !== "room" && object.id !== targetId,
+      );
+      onConfigurationChange((current) => ({
+        ...current,
+        objects: current.objects.filter((object) => object.id !== targetId),
+      }));
+      if (selected === targetId || selectedObject?.id === targetId) {
+        onSelectedChange(remaining[0]?.id ?? "");
+      }
+    }
+    setMessage(`Deleted ${name}.`);
+    showToast(`Deleted "${name}" from scene. Copy updated JSON in Config tab.`, "info");
+  }
+
   function deleteObject() {
     if (!selectedObject) return;
-    const remaining = configuration.objects.filter(
-      (object) => object.id !== "room" && object.id !== selectedObject.id,
-    );
-    onConfigurationChange((current) => ({
-      ...current,
-      objects: current.objects.filter((object) => object.id !== selectedObject.id),
-    }));
-    onSelectedChange(remaining[0]?.id ?? "");
-    setMessage(`Deleted ${selectedObject.name}.`);
+    deleteTargetObject(selectedObject.id);
   }
 
   function addLight() {
     const light = newLight(lightTypeToAdd);
-    onConfigurationChange((current) => ({ ...current, lights: [...current.lights, light] }));
+    if (cubeStudioActive) {
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: {
+          ...(current.cubeStudio ?? defaultCubeStudio),
+          lights: [...(current.cubeStudio?.lights ?? []), light],
+        },
+      }));
+    } else {
+      onConfigurationChange((current) => ({ ...current, lights: [...current.lights, light] }));
+    }
     setSelectedLight(light.id);
-    setMessage(`Added ${light.name}.`);
+    setMessage(`Added ${light.name} to ${cubeStudioActive ? "Cube View" : "Desk Scene"}.`);
   }
 
   function duplicateLight() {
     if (!selectedLightItem) return;
     const light = { ...structuredClone(selectedLightItem), id: uniqueId(selectedLightItem.type), name: `${selectedLightItem.name} copy` };
-    onConfigurationChange((current) => ({ ...current, lights: [...current.lights, light] }));
+    if (cubeStudioActive) {
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: {
+          ...(current.cubeStudio ?? defaultCubeStudio),
+          lights: [...(current.cubeStudio?.lights ?? []), light],
+        },
+      }));
+    } else {
+      onConfigurationChange((current) => ({ ...current, lights: [...current.lights, light] }));
+    }
     setSelectedLight(light.id);
+    setMessage(`Duplicated ${selectedLightItem.name}.`);
   }
 
   function deleteLight() {
     if (!selectedLightItem) return;
+    if (cubeStudioActive) {
+      const remaining = (configuration.cubeStudio?.lights ?? []).filter(
+        (light) => light.id !== selectedLightItem.id,
+      );
+      onConfigurationChange((current) => ({
+        ...current,
+        cubeStudio: {
+          ...(current.cubeStudio ?? defaultCubeStudio),
+          lights: remaining,
+        },
+      }));
+      setSelectedLight(remaining[0]?.id ?? "");
+      setMessage(`Deleted ${selectedLightItem.name}.`);
+      return;
+    }
     const remaining = configuration.lights.filter((light) => light.id !== selectedLightItem.id);
     onConfigurationChange((current) => ({
       ...current,
@@ -587,16 +1111,18 @@ export function DeskSceneEditor({
     anchor.click();
     URL.revokeObjectURL(url);
     setMessage("Scene configuration downloaded.");
+    showToast("Configuration JSON file downloaded!", "success");
   }
 
   async function copyConfiguration() {
     try {
       await navigator.clipboard.writeText(serializeSceneConfiguration(configuration));
       setMessage("Complete scene configuration copied.");
+      showToast("Configuration JSON copied to clipboard!", "success");
     } catch (error) {
-      setMessage(
-        `Could not copy configuration: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const errMsg = `Could not copy configuration: ${error instanceof Error ? error.message : String(error)}`;
+      setMessage(errMsg);
+      showToast(errMsg, "error");
     }
   }
 
@@ -607,10 +1133,11 @@ export function DeskSceneEditor({
       onSelectedChange(imported.objects.find((object) => object.id !== "room")?.id ?? "");
       setImportText("");
       setMessage("Scene configuration imported and validated.");
+      showToast("Scene configuration imported successfully!", "success");
     } catch (error) {
-      setMessage(
-        `Import failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const errMsg = `Import failed: ${error instanceof Error ? error.message : String(error)}`;
+      setMessage(errMsg);
+      showToast(errMsg, "error");
     }
   }
 
@@ -620,7 +1147,9 @@ export function DeskSceneEditor({
     try {
       importConfiguration(await file.text());
     } catch (error) {
-      setMessage(`Could not read configuration file: ${error instanceof Error ? error.message : String(error)}`);
+      const errMsg = `Could not read configuration file: ${error instanceof Error ? error.message : String(error)}`;
+      setMessage(errMsg);
+      showToast(errMsg, "error");
     } finally {
       event.target.value = "";
     }
@@ -630,6 +1159,7 @@ export function DeskSceneEditor({
     const name = presetName.trim();
     if (!name) {
       setMessage("Enter a name for this preset.");
+      showToast("Enter a name for this preset.", "error");
       return;
     }
     try {
@@ -639,6 +1169,7 @@ export function DeskSceneEditor({
       setSelectedPreset(name);
       setPresetName("");
       setMessage(`Saved preset "${name}".`);
+      showToast(`Preset "${name}" saved!`, "success");
     } catch (error) {
       setMessage(`Could not save preset: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -680,7 +1211,37 @@ export function DeskSceneEditor({
   ];
 
   const editor = (
-    <div className={`${expanded ? "fixed inset-0 z-[80] pointer-events-none" : "fixed bottom-4 right-4 z-[80] pointer-events-none"} font-label-code-sm text-label-code-sm text-on-surface`}>
+    <div
+      className={`${
+        expanded
+          ? "fixed inset-0 z-[80] pointer-events-none"
+          : `fixed bottom-4 right-[5.25rem] z-40 transition-all duration-300 ${
+              isStageVisible || open
+                ? "opacity-100 pointer-events-auto translate-y-0"
+                : "opacity-0 pointer-events-none translate-y-3"
+            }`
+      } font-label-code-sm text-label-code-sm text-on-surface`}
+    >
+      {showOrientationWarning && (
+        <div className="pointer-events-auto mb-2 flex max-w-xs items-center gap-2 rounded-xl border-2 border-primary bg-surface-container-lowest/95 p-3 text-xs text-on-surface shadow-[4px_4px_0px_#080d22] backdrop-blur-md animate-bounce">
+          <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
+            screen_rotation
+          </span>
+          <div className="flex-1">
+            <p className="font-bold text-primary">Horizontal Mode Required</p>
+            <p className="text-[11px] text-on-surface-variant leading-tight mt-0.5">
+              Please rotate your phone horizontally to access the 3D scene editor panel.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowOrientationWarning(false)}
+            className="text-on-surface-variant hover:text-on-surface cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-base">close</span>
+          </button>
+        </div>
+      )}
       <div className="pointer-events-auto ml-auto flex w-fit gap-1 pr-0">
         {open && expanded && (
           <button
@@ -709,7 +1270,7 @@ export function DeskSceneEditor({
         <button
           aria-expanded={open}
           className={`${buttonClass} flex h-10 items-center gap-2 shadow-[2px_2px_0px_#080d22]`}
-          onClick={() => onOpenChange(!open)}
+          onClick={handleEditClick}
           type="button"
         >
           <span className="material-symbols-outlined text-lg" aria-hidden="true">
@@ -721,41 +1282,132 @@ export function DeskSceneEditor({
 
       {open && (
         <div
-          className={`pointer-events-auto mt-2 overflow-y-auto ${expanded ? "fixed right-5 top-16 max-h-[calc(100vh-5rem)] w-[min(38rem,calc(100%-2.5rem))]" : "fixed bottom-16 right-4 max-h-[calc(100vh-6rem)] w-[min(38rem,calc(100%-2rem))]"} ${panelClass}`}
-          style={{ transform: `translate(${panelPosition.x}px, ${panelPosition.y}px)` }}
+          className={`pointer-events-auto fixed z-50 right-2 sm:right-4 ${
+            expanded
+              ? "top-3 sm:top-4 bottom-3 sm:bottom-4 max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)]"
+              : "top-3 sm:top-auto sm:bottom-16 bottom-3 max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-5.5rem)]"
+          } ${panelClass} flex flex-col shadow-[6px_6px_0px_#080d22] overflow-hidden`}
+          style={{
+            width: `min(${panelWidth}px, calc(100vw - 1rem))`,
+            transform: `translate(${panelPosition.x}px, ${panelPosition.y}px)`,
+          }}
         >
+          {/* Left-edge resize handle */}
           <div
-            className="mb-3 flex cursor-move touch-none flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-3"
+            aria-label="Resize panel width"
+            role="separator"
+            onPointerDown={startWidthResize}
+            onPointerMove={moveWidthResize}
+            onPointerUp={endWidthResize}
+            onPointerCancel={endWidthResize}
+            className="absolute left-0 top-0 bottom-0 w-3.5 -translate-x-2 cursor-ew-resize flex items-center justify-center group touch-none select-none z-50 hover:bg-primary/20 transition-colors"
+            title="Drag left/right to adjust editor panel width"
+          >
+            <div className="w-1.5 h-14 rounded-full bg-outline-variant/70 group-hover:bg-primary group-hover:w-2 group-active:bg-primary transition-all shadow-md flex flex-col justify-center items-center gap-0.5">
+              <span className="w-0.5 h-1 bg-surface-container-lowest rounded-full" />
+              <span className="w-0.5 h-1 bg-surface-container-lowest rounded-full" />
+              <span className="w-0.5 h-1 bg-surface-container-lowest rounded-full" />
+            </div>
+          </div>
+
+          {/* Sticky Panel Header */}
+          <div
+            className="mb-2 flex cursor-move touch-none flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-2.5 shrink-0"
             onPointerDown={startPanelDrag}
             onPointerMove={movePanelDrag}
             onPointerUp={endPanelDrag}
             onPointerCancel={endPanelDrag}
           >
-            <label className="flex items-center gap-2 font-bold">
-              <input
-                checked={configuration.enabled}
-                onChange={(event) =>
-                  onConfigurationChange((current) => ({
-                    ...current,
-                    enabled: event.target.checked,
-                  }))
-                }
-                type="checkbox"
-              />
-              Use edited scene configuration
-            </label>
-            <div className="flex gap-1">
-              <button aria-label="Undo scene change" className={buttonClass} disabled={!canUndo} onClick={onUndo} type="button">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-primary text-base select-none shrink-0" title="Drag to reposition panel">
+                drag_indicator
+              </span>
+              <label className="flex items-center gap-1.5 font-bold text-xs truncate cursor-pointer">
+                <input
+                  checked={configuration.enabled}
+                  onChange={(event) =>
+                    onConfigurationChange((current) => ({
+                      ...current,
+                      enabled: event.target.checked,
+                    }))
+                  }
+                  type="checkbox"
+                  className="rounded text-primary focus:ring-primary"
+                />
+                <span className="truncate">Use Custom Config</span>
+              </label>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Width Presets (Compact, Medium, Wide) */}
+              <div className="hidden sm:flex items-center rounded border border-outline-variant/70 bg-surface-container-low p-0.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanelWidth(360);
+                    try { localStorage.setItem("malay-scene-editor-width", "360"); } catch {}
+                  }}
+                  className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${panelWidth <= 380 ? "bg-primary text-on-primary font-bold" : "text-on-surface-variant hover:text-on-surface"}`}
+                  title="Compact width (360px)"
+                >
+                  S
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanelWidth(460);
+                    try { localStorage.setItem("malay-scene-editor-width", "460"); } catch {}
+                  }}
+                  className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${panelWidth > 380 && panelWidth <= 520 ? "bg-primary text-on-primary font-bold" : "text-on-surface-variant hover:text-on-surface"}`}
+                  title="Comfortable width (460px)"
+                >
+                  M
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanelWidth(620);
+                    try { localStorage.setItem("malay-scene-editor-width", "620"); } catch {}
+                  }}
+                  className={`px-1.5 py-0.5 rounded transition-colors cursor-pointer ${panelWidth > 520 ? "bg-primary text-on-primary font-bold" : "text-on-surface-variant hover:text-on-surface"}`}
+                  title="Wide width (620px)"
+                >
+                  L
+                </button>
+              </div>
+
+              {(panelPosition.x !== 0 || panelPosition.y !== 0) && (
+                <button
+                  type="button"
+                  onClick={() => setPanelPosition({ x: 0, y: 0 })}
+                  className={`${buttonClass} text-[11px] px-1.5 py-1 text-primary`}
+                  title="Snap back to default dock"
+                >
+                  <span className="material-symbols-outlined text-xs align-middle">dock_to_right</span>
+                </button>
+              )}
+              <button aria-label="Undo scene change" className={`${buttonClass} text-xs px-2 py-1`} disabled={!canUndo} onClick={onUndo} type="button">
                 Undo
               </button>
-              <button aria-label="Redo scene change" className={buttonClass} disabled={!canRedo} onClick={onRedo} type="button">
+              <button aria-label="Redo scene change" className={`${buttonClass} text-xs px-2 py-1`} disabled={!canRedo} onClick={onRedo} type="button">
                 Redo
               </button>
-              <button className={buttonClass} onClick={onResetAll} type="button">
+              <button className={`${buttonClass} text-xs px-2 py-1`} onClick={onResetAll} type="button">
                 Reset
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="flex h-7 w-7 items-center justify-center rounded hover:bg-error/20 text-on-surface-variant hover:text-error transition-colors cursor-pointer"
+                title="Close scene editor"
+              >
+                <span className="material-symbols-outlined text-base">close</span>
               </button>
             </div>
           </div>
+
+          {/* Scrollable Body */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1.5 scrollbar-thin">
 
           <label className="mb-3 block">
             <span className="mb-1 block">Scene name</span>
@@ -778,11 +1430,89 @@ export function DeskSceneEditor({
             />
           </label>
 
-          <div aria-label="Editor panels" className="mb-3 grid grid-cols-3 gap-1 sm:grid-cols-5">
+          {/* Active Scene Context & Navigation Toggle */}
+          <div className="mb-3 flex items-center justify-between rounded-lg border-2 border-outline-variant bg-surface-container-low p-2.5 shadow-[2px_2px_0px_#080d22]">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-xl" aria-hidden="true">
+                {cubeStudioActive ? "view_in_ar" : "desktop_windows"}
+              </span>
+              <div>
+                <span className="font-bold text-xs uppercase tracking-wider block">
+                  Editing: {cubeStudioActive ? "Cube Studio View" : "Desk View Scene"}
+                </span>
+                <span className="text-[11px] text-on-surface-variant block">
+                  {cubeStudioActive
+                    ? "Objects & lights tabs edit elements in the Cube View"
+                    : "Objects & lights tabs edit elements in the Desk Scene"}
+                </span>
+              </div>
+            </div>
+            {onToggleCubeStudio && (
+              <button
+                type="button"
+                onClick={handleToggleScene}
+                className={`${buttonClass} font-bold text-xs flex items-center gap-1.5 ${
+                  cubeStudioActive
+                    ? "bg-primary text-on-primary border-primary"
+                    : "bg-surface-container-high text-on-surface hover:border-primary"
+                }`}
+              >
+                <span className="material-symbols-outlined text-base" aria-hidden="true">
+                  {cubeStudioActive ? "desktop_windows" : "view_in_ar"}
+                </span>
+                {cubeStudioActive ? "Exit to Desk View" : "Preview Cube View"}
+              </button>
+            )}
+          </div>
+
+          {selectedObject && selectedObject.id !== "room" && (
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-primary/30 bg-primary/5 p-2.5 shadow-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="material-symbols-outlined text-primary text-lg shrink-0" aria-hidden="true">view_in_ar</span>
+                <div className="min-w-0 truncate">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-on-surface truncate">{selectedObject.name}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-mono">
+                      {selectedObject.assetId}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-on-surface-variant block">
+                    {cubeStudioActive ? "Cube Studio Object" : "Desk Scene Object"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {tab !== "objects" && (
+                  <button
+                    type="button"
+                    onClick={() => setTab("objects")}
+                    className="text-xs px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-primary font-semibold border border-outline-variant transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => deleteTargetObject(selectedObject.id)}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg text-error bg-error/10 hover:bg-error/20 border border-error/30 font-bold transition-colors"
+                  title={`Delete ${selectedObject.name} from scene`}
+                >
+                  <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
+                  Delete object
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div aria-label="Editor panels" className="mb-3 flex flex-wrap gap-1 shrink-0">
             {tabs.map(({ id, label }) => (
               <button
                 aria-pressed={tab === id}
-                className={`${buttonClass} ${tab === id ? "border-primary bg-primary-container font-bold text-on-primary-container" : ""}`}
+                className={`flex-1 min-w-[56px] rounded-lg border px-2 py-1.5 text-center font-label-code-sm text-xs transition-colors cursor-pointer truncate ${
+                  tab === id
+                    ? "border-primary bg-primary-container font-bold text-on-primary-container shadow-[2px_2px_0px_#080d22]"
+                    : "border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container-high"
+                }`}
                 key={id}
                 onClick={() => setTab(id)}
                 type="button"
@@ -801,26 +1531,62 @@ export function DeskSceneEditor({
                 placeholder="Search objects"
                 value={search}
               />
-              <label className="mb-2 block">
-                <span className="mb-1 flex items-center gap-2 font-bold">
-                  <span className="material-symbols-outlined text-lg" aria-hidden="true">view_in_ar</span>
-                  Selected object
-                </span>
-                <select
-                  aria-label="Selected scene object"
-                  className={inputClass}
-                  onChange={(event) => onSelectedChange(event.target.value)}
-                  value={selectedObject?.id ?? ""}
-                >
-                  {configuration.objects
-                    .filter((object) => object.id !== "room")
-                    .map((object) => (
-                      <option key={object.id} value={object.id}>
-                        {object.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
+              <div className="mb-2">
+                <div className="mb-1 flex items-center justify-between font-bold">
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg" aria-hidden="true">view_in_ar</span>
+                    Selected object
+                  </span>
+                  {selectedObject && selectedObject.id !== "room" && (
+                    <button
+                      type="button"
+                      onClick={() => deleteTargetObject(selectedObject.id)}
+                      className="text-xs font-semibold text-error hover:text-error/80 flex items-center gap-1 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm" aria-hidden="true">delete</span>
+                      Delete object
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    aria-label="Selected scene object"
+                    className={`${inputClass} flex-1`}
+                    onChange={(event) => onSelectedChange(event.target.value)}
+                    value={selectedObject?.id ?? ""}
+                  >
+                    <option value="">Select object</option>
+                    {activeObjectsList
+                      .filter((object) => object.id !== "room")
+                      .map((object) => (
+                        <option key={object.id} value={object.id}>
+                          {object.name}
+                        </option>
+                      ))}
+                    {activeObjectsList.filter((object) => object.id !== "room").length === 0 && (
+                      <option value="">(No objects in this view)</option>
+                    )}
+                  </select>
+                  {selectedObject && selectedObject.id !== "room" && (
+                    <button
+                      type="button"
+                      onClick={() => deleteTargetObject(selectedObject.id)}
+                      className="px-3 py-2 text-xs font-bold rounded-lg text-error bg-error/10 hover:bg-error/20 border border-error/40 flex items-center gap-1 transition-colors shrink-0"
+                      title={`Delete ${selectedObject.name} from scene`}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">delete</span>
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+              {activeObjectsList.filter((object) => object.id !== "room").length === 0 && (
+                <div className="mb-3 rounded-lg border border-dashed border-outline-variant p-4 text-center text-xs text-on-surface-variant">
+                  <span className="material-symbols-outlined text-2xl block mb-1 text-primary" aria-hidden="true">view_in_ar</span>
+                  <p className="font-bold">No custom objects in {cubeStudioActive ? "Cube View" : "Desk Scene"}</p>
+                  <p className="mt-1">Add objects using the model or primitive controls below.</p>
+                </div>
+              )}
               <ul className="mb-3 max-h-32 space-y-1 overflow-auto">
                 {filteredObjects.map((object) => (
                   <li className="flex items-center gap-2" key={object.id}>
@@ -860,6 +1626,20 @@ export function DeskSceneEditor({
                       />
                       vis
                     </label>
+                    {object.id !== "room" && (
+                      <button
+                        aria-label={`Delete ${object.name}`}
+                        className="rounded p-1 text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteTargetObject(object.id);
+                        }}
+                        title={`Delete ${object.name}`}
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined block text-base" aria-hidden="true">delete</span>
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -930,12 +1710,19 @@ export function DeskSceneEditor({
                 <>
                   <div className="mb-3 flex flex-wrap gap-2">
                     <button className={buttonClass} onClick={duplicateObject} type="button">
+                      <span className="material-symbols-outlined text-sm mr-1 align-middle" aria-hidden="true">content_copy</span>
                       Duplicate
                     </button>
-                    <button className={buttonClass} onClick={deleteObject} type="button">
-                      Delete
+                    <button
+                      className={`${buttonClass} border-error/40 text-error bg-error/10 hover:bg-error/20 font-bold`}
+                      onClick={deleteObject}
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-sm mr-1 align-middle" aria-hidden="true">delete</span>
+                      Delete object
                     </button>
                     <button className={buttonClass} onClick={() => onResetSelected(selectedObject.id)} type="button">
+                      <span className="material-symbols-outlined text-sm mr-1 align-middle" aria-hidden="true">restart_alt</span>
                       Reset transform
                     </button>
                   </div>
@@ -1046,60 +1833,100 @@ export function DeskSceneEditor({
                         Animations
                       </summary>
                       <div className="mt-3 space-y-3">
-                        <label className="flex items-center justify-between gap-2">
-                          <span>Default animation</span>
-                          <select
-                            className={inputClass}
-                            value={selectedObject.defaultAnimationId ?? ""}
+                        <label className="flex items-center justify-between gap-3 rounded-lg border-2 border-outline-variant bg-surface-container-low p-2.5 cursor-pointer hover:bg-surface-container transition-colors">
+                          <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-xl" aria-hidden="true">
+                              {selectedObject.continueAllAnimationsInLoop ? "sync" : "sync_disabled"}
+                            </span>
+                            <div>
+                              <span className="font-bold text-sm block text-on-surface">Continue all animations in loop</span>
+                              <span className="text-xs text-on-surface-variant block">Play included animations sequentially in a continuous loop</span>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selectedObject.continueAllAnimationsInLoop ?? false}
                             onChange={(event) =>
-                              updateObject(selectedObject.id, (object) => {
-                                const value = event.target.value;
-                                if (value.startsWith("embedded:")) {
-                                  const clipName = value.slice("embedded:".length);
-                                  const existing = object.animations?.find(
-                                    (animation) =>
-                                      animation.type === "embedded" &&
-                                      animation.clipName === clipName,
-                                  );
-                                  const id = existing?.id ?? `embedded-${uniqueId("clip")}`;
+                              updateObject(selectedObject.id, (object) => ({
+                                ...object,
+                                continueAllAnimationsInLoop: event.target.checked,
+                              }))
+                            }
+                            className="h-5 w-5 rounded accent-primary cursor-pointer"
+                          />
+                        </label>
+
+                        {selectedObject.continueAllAnimationsInLoop ? (
+                          <div className="rounded-md border border-primary/40 bg-primary/10 p-2 text-xs text-on-surface flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-base" aria-hidden="true">info</span>
+                            <span>Playing in sequence order below. Use <strong>▲ Move Up</strong> / <strong>▼ Move Down</strong> to reorder. Uncheck <em>Play in sequence</em> to skip any animation.</span>
+                          </div>
+                        ) : (
+                          <label className="flex items-center justify-between gap-2">
+                            <span>Single active animation</span>
+                            <select
+                              className={inputClass}
+                              value={selectedObject.defaultAnimationId ?? ""}
+                              onChange={(event) =>
+                                updateObject(selectedObject.id, (object) => {
+                                  const value = event.target.value;
+                                  if (value.startsWith("embedded:")) {
+                                    const clipName = value.slice("embedded:".length);
+                                    const existing = object.animations?.find(
+                                      (animation) =>
+                                        animation.type === "embedded" &&
+                                        animation.clipName === clipName,
+                                    );
+                                    const id = existing?.id ?? `embedded-${uniqueId("clip")}`;
+                                    return {
+                                      ...object,
+                                      animations: existing
+                                        ? object.animations
+                                        : [
+                                            ...(object.animations ?? []),
+                                            {
+                                              id,
+                                              name: clipName,
+                                              type: "embedded",
+                                              clipName,
+                                              loop: true,
+                                              timeScale: 1,
+                                            },
+                                          ],
+                                      defaultAnimationId: id,
+                                    };
+                                  }
                                   return {
                                     ...object,
-                                    animations: existing
-                                      ? object.animations
-                                      : [
-                                          ...(object.animations ?? []),
-                                          {
-                                            id,
-                                            name: clipName,
-                                            type: "embedded",
-                                            clipName,
-                                            loop: true,
-                                            timeScale: 1,
-                                          },
-                                        ],
-                                    defaultAnimationId: id,
+                                    defaultAnimationId: value || undefined,
                                   };
-                                }
-                                return {
-                                  ...object,
-                                  defaultAnimationId: value || undefined,
-                                };
-                              })
-                            }
-                          >
-                            <option value="">None</option>
-                            {(selectedObject.animations ?? []).map((animation) => (
-                              <option key={animation.id} value={animation.id}>
-                                {animation.name}
-                              </option>
-                            ))}
-                            {(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => (
-                              <option key={`embedded-${clipName}`} value={`embedded:${clipName}`}>
-                                Embedded: {clipName}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                                })
+                              }
+                            >
+                              <option value="">None</option>
+                              {(selectedObject.animations ?? []).map((animation) => (
+                                <option key={animation.id} value={animation.id}>
+                                  {animation.name}
+                                </option>
+                              ))}
+                              {(embeddedAnimations[selectedObject.id] ?? [])
+                                .filter(
+                                  (clipName) =>
+                                    !(selectedObject.animations ?? []).some(
+                                      (animation) =>
+                                        animation.type === "embedded" &&
+                                        animation.clipName === clipName,
+                                    ),
+                                )
+                                .map((clipName) => (
+                                  <option key={`embedded-${clipName}`} value={`embedded:${clipName}`}>
+                                    Embedded: {clipName}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        )}
+
                         <div className="flex flex-wrap gap-2">
                           <button
                             className={buttonClass}
@@ -1113,6 +1940,8 @@ export function DeskSceneEditor({
                                   preset: "pulse",
                                   loop: true,
                                   timeScale: 1,
+                                  duration: 3,
+                                  enabledInSequence: true,
                                 };
                                 return {
                                   ...object,
@@ -1126,50 +1955,247 @@ export function DeskSceneEditor({
                             <span className="material-symbols-outlined mr-1 align-middle text-lg" aria-hidden="true">add_circle</span>
                             Add preset
                           </button>
-                          {(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => (
-                            <button
-                              className={buttonClass}
-                              key={`add-${clipName}`}
-                              onClick={() =>
-                                updateObject(selectedObject.id, (object) => {
-                                  const id = `embedded-${uniqueId("clip")}`;
-                                  const animation: SceneObjectAnimation = {
-                                    id,
-                                    name: clipName,
-                                    type: "embedded",
-                                    clipName,
-                                    loop: true,
-                                    timeScale: 1,
-                                  };
-                                  return {
-                                    ...object,
-                                    animations: [...(object.animations ?? []), animation],
-                                    defaultAnimationId: object.defaultAnimationId ?? id,
-                                  };
-                                })
-                              }
-                              type="button"
-                            >
-                              Add {clipName}
-                            </button>
-                          ))}
+                          {(embeddedAnimations[selectedObject.id] ?? [])
+                            .filter(
+                              (clipName) =>
+                                !(selectedObject.animations ?? []).some(
+                                  (animation) =>
+                                    animation.type === "embedded" &&
+                                    animation.clipName === clipName,
+                                ),
+                            )
+                            .map((clipName) => (
+                              <button
+                                className={buttonClass}
+                                key={`add-${clipName}`}
+                                onClick={() =>
+                                  updateObject(selectedObject.id, (object) => {
+                                    const id = `embedded-${uniqueId("clip")}`;
+                                    const animation: SceneObjectAnimation = {
+                                      id,
+                                      name: clipName,
+                                      type: "embedded",
+                                      clipName,
+                                      loop: true,
+                                      timeScale: 1,
+                                      enabledInSequence: true,
+                                    };
+                                    return {
+                                      ...object,
+                                      animations: [...(object.animations ?? []), animation],
+                                      defaultAnimationId: id,
+                                    };
+                                  })
+                                }
+                                type="button"
+                              >
+                                Add {clipName}
+                              </button>
+                            ))}
                         </div>
                         {(selectedObject.animations ?? []).map((animation, index) => (
-                          <div className="grid gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2" key={animation.id}>
+                          <div className="grid gap-2 rounded-lg border-2 border-outline-variant bg-surface-container-low p-2.5" key={animation.id}>
+                            <div className="flex items-center justify-between gap-2 border-b border-outline-variant/40 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-full bg-surface-container-high px-2 py-0.5 font-mono text-xs font-bold text-primary">
+                                  #{index + 1}
+                                </span>
+                                <span className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                                  {animation.type === "embedded" ? "Extracted Clip" : "Custom Preset"}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  className={`${buttonClass} px-1.5 py-0.5 text-xs flex items-center disabled:opacity-30 disabled:cursor-not-allowed`}
+                                  disabled={index === 0}
+                                  onClick={() => {
+                                    updateObject(selectedObject.id, (object) => {
+                                      const list = [...(object.animations ?? [])];
+                                      if (index <= 0) return object;
+                                      const temp = list[index];
+                                      list[index] = list[index - 1];
+                                      list[index - 1] = temp;
+                                      return { ...object, animations: list };
+                                    });
+                                  }}
+                                  title="Move up in sequence"
+                                  type="button"
+                                >
+                                  <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_upward</span>
+                                </button>
+                                <button
+                                  className={`${buttonClass} px-1.5 py-0.5 text-xs flex items-center disabled:opacity-30 disabled:cursor-not-allowed`}
+                                  disabled={index === (selectedObject.animations ?? []).length - 1}
+                                  onClick={() => {
+                                    updateObject(selectedObject.id, (object) => {
+                                      const list = [...(object.animations ?? [])];
+                                      if (index >= list.length - 1) return object;
+                                      const temp = list[index];
+                                      list[index] = list[index + 1];
+                                      list[index + 1] = temp;
+                                      return { ...object, animations: list };
+                                    });
+                                  }}
+                                  title="Move down in sequence"
+                                  type="button"
+                                >
+                                  <span className="material-symbols-outlined text-sm" aria-hidden="true">arrow_downward</span>
+                                </button>
+                              </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-2">
                               <label>Name<input className={inputClass} value={animation.name} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) }))} /></label>
                               <label>Type<select className={inputClass} value={animation.type} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, type: event.target.value as "embedded" | "preset", preset: event.target.value === "preset" ? "pulse" : undefined, clipName: event.target.value === "embedded" ? (item.clipName ?? "") : undefined } : item) }))}><option value="preset">Custom preset</option><option value="embedded">Embedded clip</option></select></label>
                             </div>
                             {animation.type === "preset" ? (
-                              <label>Preset<select className={inputClass} value={animation.preset ?? "pulse"} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, preset: event.target.value as "pulse" | "bounce" | "rotate" | "violin-sway" } : item) }))}><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="rotate">Rotate</option><option value="violin-sway">Violin sway</option></select></label>
+                              <label>
+                                Preset
+                                <select
+                                  className={inputClass}
+                                  value={animation.preset ?? "pulse"}
+                                  onChange={(event) =>
+                                    updateObject(selectedObject.id, (object) => ({
+                                      ...object,
+                                      animations: (object.animations ?? []).map((item, itemIndex) =>
+                                        itemIndex === index
+                                          ? {
+                                              ...item,
+                                              preset: event.target.value as SceneObjectPresetAnimation,
+                                              name:
+                                                PRESET_ANIMATION_OPTIONS.find(
+                                                  (o) => o.id === event.target.value,
+                                                )?.label ?? item.name,
+                                            }
+                                          : item,
+                                      ),
+                                    }))
+                                  }
+                                >
+                                  {PRESET_ANIMATION_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
                             ) : (
-                              <label>Embedded clip<select className={inputClass} value={animation.clipName ?? ""} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, clipName: event.target.value } : item) }))}><option value="">Choose clip</option>{(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => <option key={clipName} value={clipName}>{clipName}</option>)}</select></label>
+                              <label>Embedded clip<select className={inputClass} value={animation.clipName ?? ""} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, clipName: event.target.value, name: item.name === item.clipName || !item.name ? event.target.value : item.name } : item), defaultAnimationId: object.defaultAnimationId ?? animation.id }))}><option value="">Choose clip</option>{(embeddedAnimations[selectedObject.id] ?? []).map((clipName) => <option key={clipName} value={clipName}>{clipName}</option>)}</select></label>
                             )}
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-3 gap-2 items-center">
                               <label>Speed<input className={inputClass} min={0.1} step={0.1} type="number" value={animation.timeScale} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, timeScale: Number(event.target.value) } : item) }))} /></label>
-                              <label className="flex items-center gap-2"><input checked={animation.loop} type="checkbox" onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).map((item, itemIndex) => itemIndex === index ? { ...item, loop: event.target.checked } : item) }))} />Loop</label>
+                              <label>
+                                Duration (s)
+                                <input
+                                  className={inputClass}
+                                  min={0.5}
+                                  step={0.5}
+                                  placeholder={animation.type === "embedded" ? "Auto" : "3"}
+                                  type="number"
+                                  value={animation.duration ?? ""}
+                                  onChange={(event) =>
+                                    updateObject(selectedObject.id, (object) => ({
+                                      ...object,
+                                      animations: (object.animations ?? []).map((item, itemIndex) =>
+                                        itemIndex === index
+                                          ? {
+                                              ...item,
+                                              duration: event.target.value ? Number(event.target.value) : undefined,
+                                            }
+                                          : item,
+                                      ),
+                                    }))
+                                  }
+                                />
+                              </label>
+                              <label className="flex items-center gap-2 pt-5 cursor-pointer">
+                                <input
+                                  checked={animation.loop}
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded accent-primary cursor-pointer"
+                                  onChange={(event) =>
+                                    updateObject(selectedObject.id, (object) => ({
+                                      ...object,
+                                      animations: (object.animations ?? []).map((item, itemIndex) =>
+                                        itemIndex === index ? { ...item, loop: event.target.checked } : item,
+                                      ),
+                                    }))
+                                  }
+                                />
+                                <span className="text-xs">Loop clip</span>
+                              </label>
                             </div>
-                            <button className={buttonClass} onClick={() => updateObject(selectedObject.id, (object) => ({ ...object, animations: (object.animations ?? []).filter((_, itemIndex) => itemIndex !== index), defaultAnimationId: object.defaultAnimationId === animation.id ? undefined : object.defaultAnimationId }))} type="button">Remove animation</button>
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/30 pt-2">
+                              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                                <input
+                                  type="checkbox"
+                                  checked={animation.enabledInSequence !== false}
+                                  onChange={(event) =>
+                                    updateObject(selectedObject.id, (object) => ({
+                                      ...object,
+                                      animations: (object.animations ?? []).map((item, itemIndex) =>
+                                        itemIndex === index
+                                          ? { ...item, enabledInSequence: event.target.checked }
+                                          : item,
+                                      ),
+                                    }))
+                                  }
+                                  className="h-4 w-4 rounded accent-primary cursor-pointer"
+                                />
+                                <span className={animation.enabledInSequence === false ? "text-on-surface-variant line-through" : "text-on-surface"}>
+                                  Play in sequence
+                                </span>
+                              </label>
+
+                              <div className="flex items-center gap-1.5">
+                                {!selectedObject.continueAllAnimationsInLoop && (
+                                  <button
+                                    className={`${buttonClass} flex items-center gap-1 text-xs ${
+                                      selectedObject.defaultAnimationId === animation.id
+                                        ? "border-primary bg-primary/20 font-bold text-primary"
+                                        : ""
+                                    }`}
+                                    onClick={() =>
+                                      updateObject(selectedObject.id, (object) => ({
+                                        ...object,
+                                        defaultAnimationId:
+                                          object.defaultAnimationId === animation.id
+                                            ? undefined
+                                            : animation.id,
+                                      }))
+                                    }
+                                    type="button"
+                                  >
+                                    <span className="material-symbols-outlined text-base" aria-hidden="true">
+                                      {selectedObject.defaultAnimationId === animation.id
+                                        ? "check_circle"
+                                        : "play_arrow"}
+                                    </span>
+                                    {selectedObject.defaultAnimationId === animation.id
+                                      ? "Active (Single)"
+                                      : "Set Single"}
+                                  </button>
+                                )}
+                                <button
+                                  className={`${buttonClass} text-xs text-error hover:bg-error/10`}
+                                  onClick={() =>
+                                    updateObject(selectedObject.id, (object) => ({
+                                      ...object,
+                                      animations: (object.animations ?? []).filter(
+                                        (_, itemIndex) => itemIndex !== index,
+                                      ),
+                                      defaultAnimationId:
+                                        object.defaultAnimationId === animation.id
+                                          ? undefined
+                                          : object.defaultAnimationId,
+                                    }))
+                                  }
+                                  type="button"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         ))}
                         {(selectedObject.animations ?? []).length === 0 && (
@@ -1220,6 +2246,24 @@ export function DeskSceneEditor({
                     </summary>
                     {selectedObject.material ? (
                       <div className="mt-3 grid gap-3">
+                        <label className="flex items-center gap-2 text-sm font-medium text-on-surface">
+                          <input
+                            checked={selectedObject.material.preserveTextureAndColor ?? false}
+                            onChange={(event) =>
+                              updateObject(selectedObject.id, (object) => ({
+                                ...object,
+                                material: object.material
+                                  ? {
+                                      ...object.material,
+                                      preserveTextureAndColor: event.target.checked,
+                                    }
+                                  : undefined,
+                              }))
+                            }
+                            type="checkbox"
+                          />
+                          Preserve current texture and color of the object
+                        </label>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                           <label>Base color<input className={inputClass} type="color" value={selectedObject.material.color} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, color: event.target.value } : undefined }))} /></label>
                           <label>Emissive<input className={inputClass} type="color" value={selectedObject.material.emissive} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, emissive: event.target.value } : undefined }))} /></label>
@@ -1233,45 +2277,201 @@ export function DeskSceneEditor({
                           <label className="flex items-center gap-2"><input checked={selectedObject.material.transparent} type="checkbox" onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, transparent: event.target.checked } : undefined }))} />Transparent</label>
                           <label className="flex items-center gap-2"><input checked={selectedObject.material.wireframe} type="checkbox" onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, material: object.material ? { ...object.material, wireframe: event.target.checked } : undefined }))} />Wireframe</label>
                         </div>
+
+                        {/* Self-illuminated glow without emitting light onto surroundings */}
+                        <div className="rounded-lg border border-primary/40 bg-surface-container-low p-3 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 font-bold text-on-surface cursor-pointer">
+                              <input
+                                checked={selectedObject.material.selfGlow ?? false}
+                                type="checkbox"
+                                onChange={(event) => {
+                                  const checked = event.target.checked;
+                                  updateObject(selectedObject.id, (object) => ({
+                                    ...object,
+                                    material: object.material
+                                      ? {
+                                          ...object.material,
+                                          selfGlow: checked,
+                                          emissive:
+                                            checked && (!object.material.emissive || object.material.emissive === "#000000")
+                                              ? "#ffffff"
+                                              : object.material.emissive,
+                                          emissiveIntensity:
+                                            checked && (!object.material.emissiveIntensity || object.material.emissiveIntensity === 0)
+                                              ? 1.5
+                                              : object.material.emissiveIntensity,
+                                          preserveTextureAndColor: true,
+                                          emissiveMapFromBase: object.material.emissiveMapFromBase ?? true,
+                                        }
+                                      : undefined,
+                                  }));
+                                }}
+                              />
+                              <span className="flex items-center gap-1.5">
+                                <span className="material-symbols-outlined text-primary text-base" aria-hidden="true">light_mode</span>
+                                Self-illuminated glow
+                              </span>
+                            </label>
+                            <span className="text-[10px] text-on-surface-variant font-mono uppercase tracking-wider bg-surface-container-high px-1.5 py-0.5 rounded">
+                              No scene light
+                            </span>
+                          </div>
+                          <p className="text-xs text-on-surface-variant">
+                            Intensifies object color to glow natively without casting actual light onto surrounding objects.
+                          </p>
+                          {selectedObject.material.selfGlow && (
+                            <div className="grid gap-2 pt-1 border-t border-outline-variant/50">
+                              <div className="grid grid-cols-2 gap-2">
+                                <label className="text-xs">
+                                  Glow color
+                                  <input
+                                    className={inputClass}
+                                    type="color"
+                                    value={
+                                      selectedObject.material.emissive && selectedObject.material.emissive !== "#000000"
+                                        ? selectedObject.material.emissive
+                                        : "#ffffff"
+                                    }
+                                    onChange={(event) =>
+                                      updateObject(selectedObject.id, (object) => ({
+                                        ...object,
+                                        material: object.material ? { ...object.material, emissive: event.target.value } : undefined,
+                                      }))
+                                    }
+                                  />
+                                </label>
+                                <label className="text-xs">
+                                  Glow intensity
+                                  <input
+                                    className={inputClass}
+                                    min={0}
+                                    max={10}
+                                    step={0.1}
+                                    type="number"
+                                    value={selectedObject.material.emissiveIntensity || 1.5}
+                                    onChange={(event) =>
+                                      updateObject(selectedObject.id, (object) => ({
+                                        ...object,
+                                        material: object.material
+                                          ? { ...object.material, emissiveIntensity: Number(event.target.value) }
+                                          : undefined,
+                                      }))
+                                    }
+                                  />
+                                </label>
+                              </div>
+                              <label className="flex items-center gap-2 text-xs text-on-surface cursor-pointer">
+                                <input
+                                  checked={selectedObject.material.emissiveMapFromBase ?? true}
+                                  type="checkbox"
+                                  onChange={(event) =>
+                                    updateObject(selectedObject.id, (object) => ({
+                                      ...object,
+                                      material: object.material
+                                        ? { ...object.material, emissiveMapFromBase: event.target.checked }
+                                        : undefined,
+                                    }))
+                                  }
+                                />
+                                Glow texture details (maps base texture to emissive to preserve surface details)
+                              </label>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="border-t border-outline-variant pt-3">
                           <label className="flex items-center gap-2">
                             <input
                               checked={selectedObject.glow?.enabled ?? false}
                               type="checkbox"
-                              onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: { enabled: event.target.checked, color: object.glow?.color ?? "#ffffff", intensity: object.glow?.intensity ?? 1 } }))}
+                              onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: { enabled: event.target.checked, color: object.glow?.color ?? "#ffffff", intensity: object.glow?.intensity ?? 1, offsetY: object.glow?.offsetY ?? 0 } }))}
                             />
                             Emit light
                           </label>
                           {selectedObject.glow?.enabled && (
-                            <div className="mt-2 grid grid-cols-2 gap-2">
+                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                               <label>Glow color<input className={inputClass} type="color" value={selectedObject.glow.color} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: object.glow ? { ...object.glow, color: event.target.value } : undefined }))} /></label>
                               <label>Light intensity<input className={inputClass} min={0} step={0.1} type="number" value={selectedObject.glow.intensity} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: object.glow ? { ...object.glow, intensity: Number(event.target.value) } : undefined }))} /></label>
+                              <label>Light position (Y-axis)<input className={inputClass} step={0.05} type="number" value={selectedObject.glow.offsetY ?? 0} onChange={(event) => updateObject(selectedObject.id, (object) => ({ ...object, glow: object.glow ? { ...object.glow, offsetY: Number(event.target.value) } : undefined }))} /></label>
                             </div>
                           )}
                         </div>
+                        <div className="border-t border-outline-variant pt-2">
+                          <button
+                            className={`${buttonClass} text-xs`}
+                            onClick={() =>
+                              updateObject(selectedObject.id, (object) => {
+                                const next = { ...object };
+                                delete next.material;
+                                return next;
+                              })
+                            }
+                            type="button"
+                          >
+                            Remove material controls
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <button
-                        className={`${buttonClass} mt-3`}
-                        onClick={() => updateObject(selectedObject.id, (object) => ({
-                          ...object,
-                          material: {
-                            color: "#ffffff",
-                            roughness: 0.65,
-                            metalness: 0,
-                            emissive: "#000000",
-                            emissiveIntensity: 0,
-                            transparent: false,
-                            opacity: 1,
-                            wireframe: false,
-                            side: "front",
-                          },
-                          glow: { enabled: false, color: "#ffffff", intensity: 0 },
-                        }))}
-                        type="button"
-                      >
-                        Add material controls
-                      </button>
+                      <div className="mt-3 space-y-3">
+                        <label className="flex items-center gap-2 text-sm text-on-surface">
+                          <input
+                            checked={preserveTextureOption}
+                            onChange={(event) => setPreserveTextureOption(event.target.checked)}
+                            type="checkbox"
+                          />
+                          Preserve current texture and color of the object
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className={buttonClass}
+                            onClick={() => updateObject(selectedObject.id, (object) => ({
+                              ...object,
+                              material: {
+                                color: "#ffffff",
+                                roughness: 0.65,
+                                metalness: 0,
+                                emissive: "#000000",
+                                emissiveIntensity: 0,
+                                transparent: false,
+                                opacity: 1,
+                                wireframe: false,
+                                side: "front",
+                                preserveTextureAndColor: preserveTextureOption,
+                              },
+                              glow: { enabled: false, color: "#ffffff", intensity: 0, offsetY: 0 },
+                            }))}
+                            type="button"
+                          >
+                            Add material controls
+                          </button>
+                          <button
+                            className={`${buttonClass} border-primary/40 font-bold text-primary`}
+                            onClick={() => updateObject(selectedObject.id, (object) => ({
+                              ...object,
+                              material: {
+                                color: "#ffffff",
+                                roughness: 0.65,
+                                metalness: 0,
+                                emissive: "#ffffff",
+                                emissiveIntensity: 1.5,
+                                transparent: false,
+                                opacity: 1,
+                                wireframe: false,
+                                side: "front",
+                                preserveTextureAndColor: true,
+                                selfGlow: true,
+                                emissiveMapFromBase: true,
+                              },
+                              glow: { enabled: false, color: "#ffffff", intensity: 0, offsetY: 0 },
+                            }))}
+                            type="button"
+                          >
+                            Enable self-illuminated glow
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </details>
                   <details className="mt-3 rounded-lg border-2 border-surface-variant bg-surface-container-lowest p-3" open>
@@ -1327,6 +2527,7 @@ export function DeskSceneEditor({
                             <option value="openUrl">Open URL</option>
                             <option value="showInformation">Show information</option>
                             <option value="focusObject">Focus object</option>
+                            <option value="enterCubeView">Enter Cube View</option>
                             <option value="customAction">Custom action</option>
                           </select>
                           <button
@@ -1518,6 +2719,27 @@ export function DeskSceneEditor({
                       Delete light
                     </button>
                   </div>
+                  {("target" in selectedLightItem) && (
+                    <div className="mb-3 flex items-center justify-between gap-2 rounded-lg border border-outline-variant bg-surface-container-low p-2">
+                      <span className="text-xs font-bold text-on-surface">3D Gizmo Arrow:</span>
+                      <div className="flex gap-1">
+                        <button
+                          className={`${buttonClass} text-xs py-1 px-2 ${lightTargetMode === "position" ? "border-primary bg-primary-container font-bold text-on-primary-container" : ""}`}
+                          onClick={() => onLightTargetModeChange?.("position")}
+                          type="button"
+                        >
+                          Move Light Position
+                        </button>
+                        <button
+                          className={`${buttonClass} text-xs py-1 px-2 ${lightTargetMode === "target" ? "border-primary bg-primary-container font-bold text-on-primary-container" : ""}`}
+                          onClick={() => onLightTargetModeChange?.("target")}
+                          type="button"
+                        >
+                          Move Target Aim
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <LightInspector
                     key={selectedLightItem.id}
                     light={selectedLightItem}
@@ -1529,51 +2751,326 @@ export function DeskSceneEditor({
           )}
 
           {tab === "environment" && (
-            <EnvironmentInspector environment={configuration.environment} onChange={setEnvironment} />
+            cubeStudioActive ? (
+              <section aria-label="Cube Studio Environment" className="space-y-4">
+                <div className="space-y-2 rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-on-surface-variant">
+                    Cube Enclosure &amp; 3D Position
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["X", "Y", "Z"] as const).map((axis, axisIdx) => (
+                      <label key={`cube-pos-${axis}`} className="text-xs">
+                        Position {axis}
+                        <input
+                          className={inputClass}
+                          type="number"
+                          step={5}
+                          value={(configuration.cubeStudio?.position ?? [0, 80, 0])[axisIdx]}
+                          onChange={(e) =>
+                            onConfigurationChange((c) => {
+                              const prev = [...(c.cubeStudio?.position ?? [0, 80, 0])] as VectorTuple;
+                              prev[axisIdx] = Number(e.target.value);
+                              return {
+                                ...c,
+                                cubeStudio: {
+                                  ...(c.cubeStudio ?? defaultCubeStudio),
+                                  position: prev,
+                                },
+                              };
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs">
+                      Interior Color
+                      <div className="flex items-center gap-1 mt-1">
+                        <input
+                          type="color"
+                          className="h-8 w-10 cursor-pointer rounded border border-outline-variant bg-transparent p-0"
+                          value={configuration.cubeStudio?.interiorColor ?? "#050508"}
+                          onChange={(e) =>
+                            onConfigurationChange((c) => ({
+                              ...c,
+                              cubeStudio: {
+                                ...(c.cubeStudio ?? defaultCubeStudio),
+                                interiorColor: e.target.value,
+                              },
+                            }))
+                          }
+                        />
+                        <input
+                          className={inputClass}
+                          value={configuration.cubeStudio?.interiorColor ?? "#050508"}
+                          onChange={(e) =>
+                            onConfigurationChange((c) => ({
+                              ...c,
+                              cubeStudio: {
+                                ...(c.cubeStudio ?? defaultCubeStudio),
+                                interiorColor: e.target.value,
+                              },
+                            }))
+                          }
+                        />
+                      </div>
+                    </label>
+                    <label className="text-xs">
+                      Cube Size (width)
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={10}
+                        max={100}
+                        step={1}
+                        value={configuration.cubeStudio?.cubeSize ?? 36}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              cubeSize: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs">
+                      Roughness ({configuration.cubeStudio?.roughness ?? 0.95})
+                      <input
+                        className={inputClass}
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={configuration.cubeStudio?.roughness ?? 0.95}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              roughness: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="text-xs">
+                      Metalness ({configuration.cubeStudio?.metalness ?? 0.05})
+                      <input
+                        className={inputClass}
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={configuration.cubeStudio?.metalness ?? 0.05}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              metalness: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-on-surface-variant">
+                    Cube Camera Framing
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="text-xs">
+                      Distance
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={1}
+                        max={15}
+                        step={0.2}
+                        value={configuration.cubeStudio?.cameraDistance ?? 3.8}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              cameraDistance: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="text-xs">
+                      Height
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={-5}
+                        max={10}
+                        step={0.2}
+                        value={configuration.cubeStudio?.cameraHeight ?? 1.2}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              cameraHeight: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="text-xs">
+                      Transition (s)
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={0.2}
+                        max={5}
+                        step={0.1}
+                        value={configuration.cubeStudio?.transitionDuration ?? 2.2}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              transitionDuration: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <EnvironmentInspector environment={configuration.environment} onChange={setEnvironment} />
+            )
           )}
 
           {tab === "camera" && (
-            <section aria-label="Camera path">
-              <label className="mb-3 block">
-                <span className="mb-1 block">Camera stop</span>
-                <select
-                  className={inputClass}
-                  onChange={(event) => setSelectedCamera(Number(event.target.value))}
-                  value={selectedCamera}
-                >
-                  {configuration.cameraStops.map((stop, index) => (
-                    <option key={`${stop.view}-${index}`} value={index}>
-                      {index + 1}. {stop.view} ({stop.progress})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {configuration.cameraStops[selectedCamera] && (
-                <>
-                  <label className="mb-3 block">
-                    <span className="mb-1 block">Scroll progress</span>
-                    <input
-                      aria-label="Camera stop progress"
-                      className={inputClass}
-                      max="1"
-                      min="0"
-                      onChange={(event) => updateCameraProgress(event.target.value)}
-                      step="0.01"
-                      type="number"
-                      value={configuration.cameraStops[selectedCamera].progress}
-                    />
-                  </label>
-                  {(["position", "target"] as const).map((field) => (
-                    <VectorFields
-                      field={`camera ${field}`}
-                      key={field}
-                      value={configuration.cameraStops[selectedCamera][field]}
-                      onChange={(axis, value) => updateCameraAxis(field, axis, value)}
-                    />
-                  ))}
-                </>
-              )}
-            </section>
+            cubeStudioActive ? (
+              <section aria-label="Cube Camera Framing" className="space-y-3">
+                <div className="rounded-lg border border-outline-variant bg-surface-container-low p-3 space-y-2">
+                  <h4 className="font-bold text-xs uppercase tracking-wider text-on-surface-variant">
+                    Cube View Camera Framing
+                  </h4>
+                  <p className="text-xs text-on-surface-variant">
+                    Orbit controls (rotate & zoom) are active in Cube View. Adjust camera framing defaults:
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="text-xs">
+                      Distance
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={1}
+                        max={15}
+                        step={0.2}
+                        value={configuration.cubeStudio?.cameraDistance ?? 3.8}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              cameraDistance: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="text-xs">
+                      Height
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={-5}
+                        max={10}
+                        step={0.2}
+                        value={configuration.cubeStudio?.cameraHeight ?? 1.2}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              cameraHeight: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="text-xs">
+                      Transition (s)
+                      <input
+                        className={inputClass}
+                        type="number"
+                        min={0.2}
+                        max={5}
+                        step={0.1}
+                        value={configuration.cubeStudio?.transitionDuration ?? 2.2}
+                        onChange={(e) =>
+                          onConfigurationChange((c) => ({
+                            ...c,
+                            cubeStudio: {
+                              ...(c.cubeStudio ?? defaultCubeStudio),
+                              transitionDuration: Number(e.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section aria-label="Camera path">
+                <label className="mb-3 block">
+                  <span className="mb-1 block">Camera stop</span>
+                  <select
+                    className={inputClass}
+                    onChange={(event) => setSelectedCamera(Number(event.target.value))}
+                    value={selectedCamera}
+                  >
+                    {configuration.cameraStops.map((stop, index) => (
+                      <option key={`${stop.view}-${index}`} value={index}>
+                        {index + 1}. {stop.view} ({stop.progress})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {configuration.cameraStops[selectedCamera] && (
+                  <>
+                    <label className="mb-3 block">
+                      <span className="mb-1 block">Scroll progress</span>
+                      <input
+                        aria-label="Camera stop progress"
+                        className={inputClass}
+                        max="1"
+                        min="0"
+                        onChange={(event) => updateCameraProgress(event.target.value)}
+                        step="0.01"
+                        type="number"
+                        value={configuration.cameraStops[selectedCamera].progress}
+                      />
+                    </label>
+                    {(["position", "target"] as const).map((field) => (
+                      <VectorFields
+                        field={`camera ${field}`}
+                        key={field}
+                        value={configuration.cameraStops[selectedCamera][field]}
+                        onChange={(axis, value) => updateCameraAxis(field, axis, value)}
+                      />
+                    ))}
+                  </>
+                )}
+              </section>
+            )
           )}
 
           {tab === "configuration" && (
@@ -1658,12 +3155,47 @@ export function DeskSceneEditor({
           <p aria-live="polite" className="mt-3 min-h-5 text-xs text-on-surface-variant">
             {message}
           </p>
+          </div>
         </div>
       )}
     </div>
   );
 
-  return typeof document === "undefined" ? null : createPortal(editor, document.body);
+  return typeof document === "undefined"
+    ? null
+    : createPortal(
+        <>
+          {editor}
+          {toast && (
+            <aside
+              aria-live="polite"
+              className="fixed right-5 top-5 z-[99999] flex max-w-sm items-center gap-3 rounded-xl border-2 border-primary bg-surface-container-lowest p-3.5 shadow-[4px_4px_0px_#080d22] transition-all"
+              role="status"
+            >
+              <span
+                className={`material-symbols-outlined text-xl ${
+                  toast.type === "error" ? "text-error" : "text-primary"
+                }`}
+                aria-hidden="true"
+              >
+                {toast.type === "error" ? "error" : "check_circle"}
+              </span>
+              <div className="flex-1 text-sm font-bold text-on-surface">
+                {toast.message}
+              </div>
+              <button
+                aria-label="Dismiss notification"
+                className="material-symbols-outlined cursor-pointer text-lg text-on-surface-variant hover:text-on-surface"
+                onClick={() => setToast(null)}
+                type="button"
+              >
+                close
+              </button>
+            </aside>
+          )}
+        </>,
+        document.body,
+      );
 }
 
 function TransformFields({
@@ -1689,7 +3221,7 @@ function TransformFields({
           {(["X", "Y", "Z"] as const).map((axis, index) => {
             const key = `${selectedId}-${field}-${index}`;
             return (
-              <label className="text-xs" key={axis}>
+              <label className="text-xs min-w-0" key={axis}>
                 <span className="mr-1 text-on-surface-variant">{axis}</span>
                 <input
                   aria-label={`${selectedId} ${field} ${axis}`}
@@ -1723,7 +3255,7 @@ function VectorFields({
     <fieldset className="mb-3 grid grid-cols-3 gap-2">
       <legend className="col-span-3 mb-1 capitalize">{field}</legend>
       {(["X", "Y", "Z"] as const).map((axis, index) => (
-        <label className="text-xs" key={axis}>
+        <label className="text-xs min-w-0" key={axis}>
           <span className="mr-1 text-on-surface-variant">{axis}</span>
           <input
             aria-label={`${field} ${axis}`}

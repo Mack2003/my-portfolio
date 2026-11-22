@@ -1,15 +1,27 @@
 "use client";
 
-import { Clone, useAnimations, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { useFrame, useLoader } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { AnimationClip, Box3, Group, Mesh, MeshStandardMaterial, Vector3, LoopOnce, LoopRepeat, type Object3D } from "three";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimationClip, AnimationMixer, Box3, Color, Group, Mesh, MeshStandardMaterial, Texture, Vector3, LoopOnce, LoopRepeat, type Material, type Object3D } from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import type { ModelAsset } from "../registry/assetTypes";
 import type { SceneObjectInstance } from "../config/sceneTypes";
 import { FrontSide, BackSide, DoubleSide } from "three";
+import { applyPresetAnimation } from "../animations";
+
+type MaterialWithMaps = Material & {
+  map?: Texture | null;
+  normalMap?: Texture | null;
+  roughnessMap?: Texture | null;
+  metalnessMap?: Texture | null;
+  aoMap?: Texture | null;
+  alphaMap?: Texture | null;
+  emissiveMap?: Texture | null;
+  color?: Color;
+};
 
 function FittedClone({
   source,
@@ -57,17 +69,77 @@ function FittedClone({
               : instance.material.side === "double"
                 ? DoubleSide
                 : FrontSide;
-          mesh.material = new MeshStandardMaterial({
-            color: instance.material.color,
-            roughness: instance.material.roughness,
-            metalness: instance.material.metalness,
-            emissive: instance.material.emissive,
-            emissiveIntensity: instance.material.emissiveIntensity,
-            transparent: instance.material.transparent,
-            opacity: instance.material.opacity,
-            wireframe: instance.material.wireframe,
-            side,
-          });
+
+          const applyMat = (origMat: Material): MeshStandardMaterial => {
+            const orig = origMat as MaterialWithMaps;
+            const preserve = Boolean(
+              instance.material!.preserveTextureAndColor ??
+              instance.material!.preserveOriginalTexture ??
+              instance.material!.selfGlow,
+            );
+            const origMap = preserve && orig.map ? orig.map : (instance.material!.emissiveMapFromBase && orig.map ? orig.map : null);
+            const origNormalMap = preserve && orig.normalMap ? orig.normalMap : null;
+            const origRoughnessMap = preserve && orig.roughnessMap ? orig.roughnessMap : null;
+            const origMetalnessMap = preserve && orig.metalnessMap ? orig.metalnessMap : null;
+            const origAoMap = preserve && orig.aoMap ? orig.aoMap : null;
+            const origAlphaMap = preserve && orig.alphaMap ? orig.alphaMap : null;
+
+            // If the mesh has a base texture (material.map), assign that same texture to material.emissiveMap
+            // so the surface details remain visible and glow naturally rather than washing out.
+            const useBaseAsEmissive = Boolean(
+              instance.material!.emissiveMapFromBase ?? (instance.material!.selfGlow || instance.material!.emissiveIntensity > 0),
+            );
+            const origEmissiveMap = orig.emissiveMap ?? (useBaseAsEmissive && orig.map ? orig.map : null);
+
+            let color = instance.material!.color;
+            if (
+              preserve &&
+              (!color || color.toLowerCase() === "#ffffff") &&
+              orig.color &&
+              typeof orig.color.getHexString === "function" &&
+              !origMap
+            ) {
+              color = `#${orig.color.getHexString()}`;
+            }
+
+            const emissiveColor = instance.material!.selfGlow
+              ? (instance.material!.emissive && instance.material!.emissive !== "#000000"
+                ? instance.material!.emissive
+                : (color && color.toLowerCase() !== "#ffffff" ? color : (orig.color ? `#${orig.color.getHexString()}` : "#ffffff")))
+              : (instance.material!.emissive ?? "#000000");
+
+            const emissiveIntensity = instance.material!.selfGlow
+              ? (instance.material!.emissiveIntensity > 0 ? instance.material!.emissiveIntensity : 1.5)
+              : (instance.material!.emissiveIntensity ?? 0);
+
+            const converted = new MeshStandardMaterial({
+              color: color ?? "#ffffff",
+              map: origMap,
+              normalMap: origNormalMap,
+              roughnessMap: origRoughnessMap,
+              metalnessMap: origMetalnessMap,
+              aoMap: origAoMap,
+              alphaMap: origAlphaMap,
+              emissiveMap: origEmissiveMap,
+              roughness: instance.material!.roughness,
+              metalness: instance.material!.metalness,
+              emissive: emissiveColor,
+              emissiveIntensity: emissiveIntensity,
+              transparent:
+                instance.material!.transparent || (preserve && Boolean(orig.transparent)),
+              opacity: instance.material!.opacity,
+              wireframe: instance.material!.wireframe,
+              side,
+            });
+            converted.needsUpdate = true;
+            return converted;
+          };
+
+          if (Array.isArray(mesh.material)) {
+            mesh.material = mesh.material.map(applyMat);
+          } else {
+            mesh.material = applyMat(mesh.material);
+          }
         }
       }
     });
@@ -77,12 +149,26 @@ function FittedClone({
 
   const groupRef = useRef<Group>(null);
   const basePosition = useRef(new Vector3(...instance.transform.position));
-  const baseRotation = useRef(new Vector3(
-    (instance.transform.rotation[0] * Math.PI) / 180,
-    (instance.transform.rotation[1] * Math.PI) / 180,
-    (instance.transform.rotation[2] * Math.PI) / 180,
-  ));
-  const presetMixer = useAnimations(animations ?? [], groupRef);
+  const baseRotation = useRef(
+    new Vector3(
+      (instance.transform.rotation[0] * Math.PI) / 180,
+      (instance.transform.rotation[1] * Math.PI) / 180,
+      (instance.transform.rotation[2] * Math.PI) / 180,
+    ),
+  );
+  const wasPresetActive = useRef(false);
+  const mixerRef = useRef<AnimationMixer | null>(null);
+
+  useEffect(() => {
+    const mixer = new AnimationMixer(model);
+    mixerRef.current = mixer;
+    return () => {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(model);
+      mixerRef.current = null;
+    };
+  }, [model]);
+
   const setObjectRef = useCallback(
     (object: Group | null) => {
       groupRef.current = object;
@@ -95,6 +181,25 @@ function FittedClone({
     (instance.transform.rotation[1] * Math.PI) / 180,
     (instance.transform.rotation[2] * Math.PI) / 180,
   ];
+
+  useEffect(() => {
+    basePosition.current.set(...instance.transform.position);
+    baseRotation.current.set(
+      (instance.transform.rotation[0] * Math.PI) / 180,
+      (instance.transform.rotation[1] * Math.PI) / 180,
+      (instance.transform.rotation[2] * Math.PI) / 180,
+    );
+    const group = groupRef.current;
+    if (group) {
+      group.position.set(...instance.transform.position);
+      group.rotation.set(
+        (instance.transform.rotation[0] * Math.PI) / 180,
+        (instance.transform.rotation[1] * Math.PI) / 180,
+        (instance.transform.rotation[2] * Math.PI) / 180,
+      );
+      group.scale.set(...instance.transform.scale);
+    }
+  }, [instance.transform.position, instance.transform.rotation, instance.transform.scale]);
 
   useEffect(() => {
     if (!namedObjectNames || !onNamedObjectRef) return;
@@ -119,63 +224,151 @@ function FittedClone({
     }
   }, [animations, instance.id, onEmbeddedAnimationsDiscovered]);
 
+  const sequence = useMemo(
+    () => (instance.animations ?? []).filter((anim) => anim.enabledInSequence !== false),
+    [instance.animations],
+  );
+  const [sequenceIndex, setSequenceIndex] = useState(0);
+  const sequenceTimer = useRef(0);
+
+  const activeSequenceAnim =
+    instance.continueAllAnimationsInLoop && sequence.length > 0
+      ? sequence[sequenceIndex % sequence.length]
+      : null;
+
+  const activeDefinition =
+    activeSequenceAnim ??
+    instance.animations?.find(
+      (animation) => animation.id === (activeAnimationId ?? instance.defaultAnimationId),
+    ) ??
+    null;
+
+  const currentDuration = useMemo(() => {
+    if (!activeDefinition) return 3;
+    if (typeof activeDefinition.duration === "number" && activeDefinition.duration > 0) {
+      return activeDefinition.duration;
+    }
+    if (activeDefinition.type === "embedded" && animations) {
+      const clip = animations.find(
+        (c) =>
+          c.name === activeDefinition.clipName ||
+          c.name.trim() === activeDefinition.clipName?.trim(),
+      );
+      if (clip && clip.duration > 0) {
+        const speed =
+          typeof activeDefinition.timeScale === "number" && activeDefinition.timeScale > 0
+            ? activeDefinition.timeScale
+            : 1;
+        return clip.duration / speed;
+      }
+    }
+    return 3;
+  }, [activeDefinition, animations]);
+
   useEffect(() => {
-    const selectedId = activeAnimationId ?? instance.defaultAnimationId;
-    const definition = instance.animations?.find(
-      (animation) => animation.id === selectedId,
-    );
-    if (!definition || definition.type !== "embedded") {
-      Object.values(presetMixer.actions).forEach((action) => action?.stop());
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+
+    if (!activeDefinition || activeDefinition.type !== "embedded" || !activeDefinition.clipName) {
+      mixer.stopAllAction();
       return;
     }
-    const action = presetMixer.actions[definition.clipName ?? ""];
-    if (!action) return;
-    action
-      .reset()
-      .setEffectiveTimeScale(definition.timeScale)
-      .setLoop(definition.loop ? LoopRepeat : LoopOnce, definition.loop ? Infinity : 1)
-      .fadeIn(0.15)
-      .play();
-    return () => {
-      action.fadeOut(0.15);
-    };
-  }, [activeAnimationId, instance.animations, instance.defaultAnimationId, presetMixer.actions]);
 
-  useFrame(({ clock }) => {
+    const clip = (animations ?? []).find(
+      (item) =>
+        item.name === activeDefinition.clipName ||
+        item.name.trim() === activeDefinition.clipName?.trim(),
+    );
+    if (!clip) {
+      mixer.stopAllAction();
+      return;
+    }
+
+    mixer.stopAllAction();
+    const action = mixer.clipAction(clip, model);
+    const speed =
+      typeof activeDefinition.timeScale === "number" && !isNaN(activeDefinition.timeScale)
+        ? activeDefinition.timeScale
+        : 1;
+
+    action.reset();
+    action.setEffectiveTimeScale(speed);
+    action.setEffectiveWeight(1);
+    action.setLoop(
+      activeDefinition.loop ? LoopRepeat : LoopOnce,
+      activeDefinition.loop ? Infinity : 1,
+    );
+    action.fadeIn(0.12);
+    action.play();
+
+    return () => {
+      action.fadeOut(0.12);
+    };
+  }, [activeDefinition, animations, model]);
+
+  useFrame(({ clock }, delta) => {
+    mixerRef.current?.update(delta);
+
+    if (instance.continueAllAnimationsInLoop && sequence.length > 1) {
+      sequenceTimer.current += delta;
+      if (sequenceTimer.current >= currentDuration) {
+        sequenceTimer.current = 0;
+        setSequenceIndex((prev) => (prev + 1) % sequence.length);
+      }
+    } else {
+      sequenceTimer.current = 0;
+    }
+
     const group = groupRef.current;
     if (!group) return;
-    const selectedId = activeAnimationId ?? instance.defaultAnimationId;
-    const definition = instance.animations?.find(
-      (animation) => animation.id === selectedId,
-    );
-    if (!definition || definition.type !== "preset") {
-      group.position.set(
-        basePosition.current.x,
-        basePosition.current.y,
-        basePosition.current.z,
-      );
-      group.rotation.set(
-        baseRotation.current.x,
-        baseRotation.current.y,
-        baseRotation.current.z,
-      );
+
+    if (!activeDefinition || activeDefinition.type !== "preset" || !activeDefinition.preset) {
+      if (wasPresetActive.current) {
+        group.position.set(
+          basePosition.current.x,
+          basePosition.current.y,
+          basePosition.current.z,
+        );
+        group.rotation.set(
+          baseRotation.current.x,
+          baseRotation.current.y,
+          baseRotation.current.z,
+        );
+        group.scale.set(
+          instance.transform.scale[0],
+          instance.transform.scale[1],
+          instance.transform.scale[2],
+        );
+        const bowNode = group.getObjectByName("Bow");
+        if (bowNode && bowNode.userData.basePosition) {
+          const bp = bowNode.userData.basePosition as Vector3;
+          const br = bowNode.userData.baseRotation as Vector3;
+          bowNode.position.copy(bp);
+          bowNode.rotation.set(br.x, br.y, br.z);
+        }
+        wasPresetActive.current = false;
+      }
       return;
     }
-    const time = clock.elapsedTime * definition.timeScale;
-    if (definition.preset === "pulse") {
-      const pulse = 1 + Math.sin(time * 3) * 0.08;
-      group.scale.set(instance.transform.scale[0] * pulse, instance.transform.scale[1] * pulse, instance.transform.scale[2] * pulse);
-    } else if (definition.preset === "bounce") {
-      group.position.set(basePosition.current.x, basePosition.current.y + Math.abs(Math.sin(time * 2.5)) * 0.18, basePosition.current.z);
-    } else if (definition.preset === "rotate") {
-      group.rotation.set(baseRotation.current.x, baseRotation.current.y + time, baseRotation.current.z);
-    } else if (definition.preset === "violin-sway") {
-      group.rotation.set(
-        baseRotation.current.x,
-        baseRotation.current.y + Math.sin(time * 2.2) * 0.08,
-        baseRotation.current.z + Math.sin(time * 1.8) * 0.05,
-      );
+    if (activeDefinition.preset !== "bow-swing" && activeDefinition.preset !== "bow-stroke") {
+      const bowNode = group.getObjectByName("Bow");
+      if (bowNode && bowNode.userData.basePosition) {
+        const bp = bowNode.userData.basePosition as Vector3;
+        const br = bowNode.userData.baseRotation as Vector3;
+        bowNode.position.copy(bp);
+        bowNode.rotation.set(br.x, br.y, br.z);
+      }
     }
+    wasPresetActive.current = true;
+    applyPresetAnimation(activeDefinition.preset, {
+      group,
+      basePosition: basePosition.current,
+      baseRotation: baseRotation.current,
+      baseScale: instance.transform.scale,
+      elapsedTime: clock.elapsedTime,
+      timeScale: activeDefinition.timeScale || 1,
+      delta,
+    });
   });
 
   return (
@@ -186,9 +379,10 @@ function FittedClone({
       scale={instance.transform.scale}
       visible={instance.visible}
     >
-      <Clone object={model} />
+      <primitive object={model} />
       {instance.glow?.enabled && (
         <pointLight
+          position={[0, instance.glow.offsetY ?? 0, 0]}
           color={instance.glow.color}
           intensity={instance.glow.intensity}
           distance={Math.max(1, instance.glow.intensity * 2)}
@@ -211,7 +405,7 @@ function ObjObject(props: Omit<Parameters<typeof FittedClone>[0], "source"> & { 
 
 function FbxObject(props: Omit<Parameters<typeof FittedClone>[0], "source"> & { asset: ModelAsset }) {
   const object = useLoader(FBXLoader, props.asset.path);
-  return <FittedClone {...props} source={object} />;
+  return <FittedClone {...props} source={object} animations={object.animations} />;
 }
 
 function PrimitiveObject({
@@ -225,11 +419,14 @@ function PrimitiveObject({
 }) {
   const groupRef = useRef<Group>(null);
   const basePosition = useRef(new Vector3(...instance.transform.position));
-  const baseRotation = useRef(new Vector3(
-    (instance.transform.rotation[0] * Math.PI) / 180,
-    (instance.transform.rotation[1] * Math.PI) / 180,
-    (instance.transform.rotation[2] * Math.PI) / 180,
-  ));
+  const baseRotation = useRef(
+    new Vector3(
+      (instance.transform.rotation[0] * Math.PI) / 180,
+      (instance.transform.rotation[1] * Math.PI) / 180,
+      (instance.transform.rotation[2] * Math.PI) / 180,
+    ),
+  );
+  const wasPresetActive = useRef(false);
   const setObjectRef = useCallback(
     (object: Group | null) => {
       groupRef.current = object;
@@ -252,28 +449,85 @@ function PrimitiveObject({
         ? DoubleSide
         : FrontSide;
 
-  useFrame(({ clock }) => {
+  useEffect(() => {
+    basePosition.current.set(...instance.transform.position);
+    baseRotation.current.set(
+      (instance.transform.rotation[0] * Math.PI) / 180,
+      (instance.transform.rotation[1] * Math.PI) / 180,
+      (instance.transform.rotation[2] * Math.PI) / 180,
+    );
+    const group = groupRef.current;
+    if (group) {
+      group.position.set(...instance.transform.position);
+      group.rotation.set(
+        (instance.transform.rotation[0] * Math.PI) / 180,
+        (instance.transform.rotation[1] * Math.PI) / 180,
+        (instance.transform.rotation[2] * Math.PI) / 180,
+      );
+      group.scale.set(...instance.transform.scale);
+    }
+  }, [instance.transform.position, instance.transform.rotation, instance.transform.scale]);
+
+  const sequence = useMemo(
+    () => (instance.animations ?? []).filter((anim) => anim.enabledInSequence !== false),
+    [instance.animations],
+  );
+  const [sequenceIndex, setSequenceIndex] = useState(0);
+  const sequenceTimer = useRef(0);
+
+  const activeSequenceAnim =
+    instance.continueAllAnimationsInLoop && sequence.length > 0
+      ? sequence[sequenceIndex % sequence.length]
+      : null;
+
+  const activeDefinition =
+    activeSequenceAnim ??
+    instance.animations?.find(
+      (animation) => animation.id === (activeAnimationId ?? instance.defaultAnimationId),
+    ) ??
+    null;
+
+  const currentDuration = useMemo(() => {
+    if (!activeDefinition) return 3;
+    if (typeof activeDefinition.duration === "number" && activeDefinition.duration > 0) {
+      return activeDefinition.duration;
+    }
+    return 3;
+  }, [activeDefinition]);
+
+  useFrame(({ clock }, delta) => {
+    if (instance.continueAllAnimationsInLoop && sequence.length > 1) {
+      sequenceTimer.current += delta;
+      if (sequenceTimer.current >= currentDuration) {
+        sequenceTimer.current = 0;
+        setSequenceIndex((prev) => (prev + 1) % sequence.length);
+      }
+    } else {
+      sequenceTimer.current = 0;
+    }
+
     const group = groupRef.current;
     if (!group) return;
-    const selectedId = activeAnimationId ?? instance.defaultAnimationId;
-    const definition = instance.animations?.find((animation) => animation.id === selectedId);
-    if (!definition || definition.type !== "preset") {
-      group.position.set(basePosition.current.x, basePosition.current.y, basePosition.current.z);
-      group.rotation.set(baseRotation.current.x, baseRotation.current.y, baseRotation.current.z);
-      group.scale.set(instance.transform.scale[0], instance.transform.scale[1], instance.transform.scale[2]);
+
+    if (!activeDefinition || activeDefinition.type !== "preset" || !activeDefinition.preset) {
+      if (wasPresetActive.current) {
+        group.position.set(basePosition.current.x, basePosition.current.y, basePosition.current.z);
+        group.rotation.set(baseRotation.current.x, baseRotation.current.y, baseRotation.current.z);
+        group.scale.set(instance.transform.scale[0], instance.transform.scale[1], instance.transform.scale[2]);
+        wasPresetActive.current = false;
+      }
       return;
     }
-    const time = clock.elapsedTime * definition.timeScale;
-    if (definition.preset === "pulse") {
-      const pulse = 1 + Math.sin(time * 3) * 0.08;
-      group.scale.set(instance.transform.scale[0] * pulse, instance.transform.scale[1] * pulse, instance.transform.scale[2] * pulse);
-    } else if (definition.preset === "bounce") {
-      group.position.set(basePosition.current.x, basePosition.current.y + Math.abs(Math.sin(time * 2.5)) * 0.18, basePosition.current.z);
-    } else if (definition.preset === "rotate") {
-      group.rotation.set(baseRotation.current.x, baseRotation.current.y + time, baseRotation.current.z);
-    } else if (definition.preset === "violin-sway") {
-      group.rotation.set(baseRotation.current.x, baseRotation.current.y + Math.sin(time * 2.2) * 0.08, baseRotation.current.z + Math.sin(time * 1.8) * 0.05);
-    }
+    wasPresetActive.current = true;
+    applyPresetAnimation(activeDefinition.preset, {
+      group,
+      basePosition: basePosition.current,
+      baseRotation: baseRotation.current,
+      baseScale: instance.transform.scale,
+      elapsedTime: clock.elapsedTime,
+      timeScale: activeDefinition.timeScale || 1,
+      delta,
+    });
   });
 
   const geometryNode = (() => {
@@ -315,8 +569,18 @@ function PrimitiveObject({
           color={material?.color ?? "#ffffff"}
           roughness={material?.roughness ?? 0.65}
           metalness={material?.metalness ?? 0}
-          emissive={material?.emissive ?? "#000000"}
-          emissiveIntensity={material?.emissiveIntensity ?? 0}
+          emissive={
+            material?.selfGlow
+              ? (material.emissive && material.emissive !== "#000000"
+                ? material.emissive
+                : (material.color && material.color !== "#ffffff" ? material.color : "#ffffff"))
+              : (material?.emissive ?? "#000000")
+          }
+          emissiveIntensity={
+            material?.selfGlow
+              ? (material.emissiveIntensity > 0 ? material.emissiveIntensity : 1.5)
+              : (material?.emissiveIntensity ?? 0)
+          }
           transparent={material?.transparent ?? false}
           opacity={material?.opacity ?? 1}
           wireframe={material?.wireframe ?? false}
@@ -325,6 +589,7 @@ function PrimitiveObject({
       </mesh>
       {instance.glow?.enabled && (
         <pointLight
+          position={[0, instance.glow.offsetY ?? 0, 0]}
           color={instance.glow.color}
           intensity={instance.glow.intensity}
           distance={Math.max(1, instance.glow.intensity * 2)}

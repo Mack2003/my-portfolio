@@ -1,9 +1,18 @@
 /* eslint-disable @next/next/no-page-custom-font, @next/next/google-font-display */
 import type { Metadata } from "next";
 import "./globals.css";
+import { portfolioData } from "@/data/portfolio";
 
 export const metadata: Metadata = {
-  title: "Malay Ray | Creative Technologist & Software Engineer",
+  title: portfolioData.metadata.title,
+  description: portfolioData.metadata.description,
+  keywords: portfolioData.metadata.keywords,
+  openGraph: {
+    title: portfolioData.metadata.title,
+    description: portfolioData.metadata.description,
+    type: "website",
+    locale: "en_US",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

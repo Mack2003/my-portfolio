@@ -17,6 +17,7 @@ type SceneInteractionControllerProps = {
   onInformation: (title: string, content: string) => void;
   onAnimation: (objectId: string, animation: string, duration: number) => void;
   onFocusObject: (objectId: string, duration: number) => void;
+  onEnterCubeView?: (targetObjectId: string, action: SceneInteractionAction) => void;
 };
 
 function isSafeUrl(value: string): boolean {
@@ -36,6 +37,7 @@ export function SceneInteractionController({
   onInformation,
   onAnimation,
   onFocusObject,
+  onEnterCubeView,
 }: SceneInteractionControllerProps) {
   const { camera, gl, scene } = useThree();
   const raycasterRef = useRef(new Raycaster());
@@ -76,14 +78,16 @@ export function SceneInteractionController({
           }
           owner = owner.parent;
         }
-        if (matchId && matchId !== "room") {
+        if (matchId && matchId !== "room" && matchId !== "cube-environment" && matchId !== "giant-cube") {
           ownerId = matchId;
           break;
         }
       }
       if (!ownerId) return;
 
-      const object = configuration.objects.find((item) => item.id === ownerId);
+      const object =
+        configuration.objects.find((item) => item.id === ownerId) ??
+        configuration.cubeStudio?.objects?.find((item) => item.id === ownerId);
       if (!object || !object.enabled || !object.visible) return;
 
       if (editing) {
@@ -161,6 +165,19 @@ export function SceneInteractionController({
               onFocusObject(targetId, action.duration ?? 1.5);
               break;
             }
+            case "enterCubeView": {
+              const targetId = action.targetObjectId ?? object.id;
+              if (onEnterCubeView) {
+                onEnterCubeView(targetId, action);
+              } else {
+                window.dispatchEvent(
+                  new CustomEvent("portfolio:enter-cube-view", {
+                    detail: { targetObjectId: targetId, action },
+                  }),
+                );
+              }
+              break;
+            }
             case "customAction":
               window.dispatchEvent(
                 new CustomEvent("portfolio:scene-action", {
@@ -181,7 +198,7 @@ export function SceneInteractionController({
       domElement.removeEventListener("pointerdown", onPointerDown);
       domElement.removeEventListener("pointerup", onPointerUp);
     };
-  }, [camera, configuration, editing, gl, onAnimation, onFocusObject, onInformation, onSelectedChange, objectRefs, scene]);
+  }, [camera, configuration, editing, gl, onAnimation, onFocusObject, onInformation, onSelectedChange, onEnterCubeView, objectRefs, scene]);
 
   useEffect(() => () => {
     audioRef.current.forEach((audio) => {
