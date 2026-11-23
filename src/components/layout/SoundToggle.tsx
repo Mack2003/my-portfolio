@@ -215,18 +215,18 @@ export default function SoundToggle() {
 
           {/* Light text below: Scroll through page while listening to music */}
           <div
-            className={`fixed z-[75] left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none transition-all duration-300 px-4 text-center ${
+            className={`fixed z-[75] left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none transition-all duration-300 w-max max-w-[calc(100vw-1.5rem)] px-2 sm:px-4 text-center ${
               overlayActive ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
             }`}
             style={{
               top: "calc(50vh + 3.25rem)",
             }}
           >
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high/90 border border-surface-variant backdrop-blur-md shadow-[3px_3px_0px_#080d22]">
-              <span className="material-symbols-outlined text-sm text-tertiary" aria-hidden="true">
+            <div className="flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-4 sm:py-1.5 rounded-full bg-surface-container-high/90 border border-surface-variant backdrop-blur-md shadow-[3px_3px_0px_#080d22] whitespace-nowrap">
+              <span className="material-symbols-outlined text-xs sm:text-sm text-tertiary shrink-0" aria-hidden="true">
                 headphones
               </span>
-              <span className="font-label-code-sm text-xs sm:text-sm text-on-surface font-semibold tracking-wide">
+              <span className="font-label-code-sm text-[11px] sm:text-sm text-on-surface font-semibold tracking-wide">
                 Scroll through page while listening to music
               </span>
             </div>
