@@ -939,25 +939,25 @@ export default function SnakeRibbonOverlay({
       }}
       aria-label="Interactive Snake Ribbon Experience"
     >
-      {/* Floating Tooltip Prompt: Tap Snake Head Twice */}
+      {/* Floating Tooltip Prompt: Compact Double Tap Indicator (Positioned clear of snake face) */}
       {isAwaitingDoubleTap && (
         <div
           className="pointer-events-auto absolute z-40 -translate-x-1/2 -translate-y-full cursor-pointer select-none transition-all duration-300"
           style={{
-            left: `${headPos.x}px`,
-            top: `${Math.max(18, headPos.y - 28)}px`,
+            left: `${Math.max(48, Math.min(containerSizeRef.current.w - 48, headPos.x))}px`,
+            top: `${Math.max(12, headPos.y - 52)}px`,
           }}
           onPointerDown={onHeadPointerDown}
           onDoubleClick={onHeadDoubleClick}
-          title="Tap or double-click to move snake away"
+          title="Double tap to dismiss snake"
         >
-          <div className="flex items-center gap-2 rounded-full border border-sky-400/50 bg-slate-900/90 px-3.5 py-1.5 shadow-[0_0_20px_rgba(56,189,248,0.4)] backdrop-blur-md animate-pulse">
-            <span className="flex h-2 w-2 relative">
+          <div className="flex items-center gap-1.5 rounded-full border border-sky-400/50 bg-slate-950/90 px-3 py-1 shadow-[0_0_16px_rgba(56,189,248,0.35)] backdrop-blur-md animate-pulse">
+            <span className="flex h-1.5 w-1.5 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-400" />
             </span>
-            <span className="font-mono text-[11px] font-medium text-sky-200">
-              tap the snake head twice to move the snake away
+            <span className="font-mono text-[11px] font-bold text-sky-200 tracking-wider uppercase whitespace-nowrap">
+              Double tap
             </span>
           </div>
           <div className="mx-auto h-0 w-0 border-x-4 border-t-4 border-x-transparent border-t-sky-400/60" />
