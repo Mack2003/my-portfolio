@@ -173,6 +173,7 @@ function CameraMotion({
   cubeViewActive = false,
   cubeStudioConfig,
   onTransitionProgress,
+  manualProgress,
 }: {
   story: RefObject<HTMLDivElement | null>;
   onStep: (view: CameraView) => void;
@@ -182,12 +183,14 @@ function CameraMotion({
   cubeViewActive?: boolean;
   cubeStudioConfig?: CubeStudioConfiguration;
   onTransitionProgress?: (progress: number) => void;
+  manualProgress?: number | null;
 }) {
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const position = useRef(new Vector3());
   const target = useRef(new Vector3());
   const nextPosition = useRef(new Vector3());
   const nextTarget = useRef(new Vector3());
+  const currentTarget = useRef(new Vector3(0, 1.1, -1.2));
   const currentStep = useRef<CameraView>("overview");
   const transitionRef = useRef({ progress: 0, fromActive: false });
 
@@ -214,7 +217,9 @@ function CameraMotion({
 
     const distance = Math.max(element.offsetHeight - window.innerHeight, 0);
     const scroll = Math.max(0, -element.getBoundingClientRect().top);
-    const progress = distance > 0 ? Math.min(1, Math.max(0, scroll / distance)) : 0;
+    const scrollProgress = distance > 0 ? Math.min(1, Math.max(0, scroll / distance)) : 0;
+    const progress =
+      manualProgress !== null && manualProgress !== undefined ? manualProgress : scrollProgress;
 
     const stops = cameraStops;
     let start = stops[0];
@@ -286,8 +291,14 @@ function CameraMotion({
       activeCamera.zoom = deskZoom;
       activeCamera.updateProjectionMatrix();
     }
-    controls.current?.target.lerp(target.current, easing);
-    controls.current?.update();
+    if (controls.current) {
+      controls.current.target.lerp(target.current, easing);
+      controls.current.update();
+      currentTarget.current.copy(controls.current.target);
+    } else {
+      currentTarget.current.lerp(target.current, easing);
+      activeCamera.lookAt(currentTarget.current);
+    }
 
     if (t < 0.5) {
       const activeStep =
@@ -301,19 +312,19 @@ function CameraMotion({
     }
   });
 
-  return (
+  return editing ? (
     <OrbitControls
       ref={controls}
       enabled={editing}
       enableDamping
-      enableRotate={editing && !cubeViewActive}
-      enablePan={editing && !cubeViewActive}
-      enableZoom={editing}
+      enableRotate={!cubeViewActive}
+      enablePan={!cubeViewActive}
+      enableZoom
       dampingFactor={0.08}
       minDistance={cubeViewActive ? 0.5 : 1.5}
       maxDistance={cubeViewActive ? 40 : 20}
     />
-  );
+  ) : null;
 }
 
 function RoomScene({
@@ -350,6 +361,7 @@ function RoomScene({
   onLightPositionCommit,
   onLightTargetCommit,
   onLightRotationCommit,
+  manualProgress,
 }: {
   story: RefObject<HTMLDivElement | null>;
   onStep: (view: CameraView) => void;
@@ -384,6 +396,7 @@ function RoomScene({
   onLightPositionCommit: (id: string, newPosition: VectorTuple) => void;
   onLightTargetCommit: (id: string, newTarget: VectorTuple) => void;
   onLightRotationCommit: (id: string, newRotation: VectorTuple) => void;
+  manualProgress?: number | null;
 }) {
   const bowRef = useRef<Object3D | null>(null);
   const stringsRef = useRef<Object3D | null>(null);
@@ -437,6 +450,7 @@ function RoomScene({
         cubeViewActive={cubeStudioActive}
         cubeStudioConfig={configuration.cubeStudio}
         onTransitionProgress={onCubeStudioProgress}
+        manualProgress={manualProgress}
       />
       <SceneInteractionController
         configuration={configuration}
@@ -460,6 +474,7 @@ function RoomScene({
 
 const controls: { id: CameraView | "reset"; label: string }[] = [
   { id: "reset", label: "Overview ↺" },
+  { id: "wall", label: "Wall 🧱" },
   { id: "violin", label: "Violin 🎻" },
   { id: "laptop", label: "Laptop 💻" },
   { id: "screen", label: "Screen 🔍" },
@@ -541,6 +556,8 @@ export default function DeskStage() {
 
   const [activeAnimations, setActiveAnimations] = useState<Record<string, string>>({});
   const [embeddedAnimations, setEmbeddedAnimations] = useState<Record<string, string[]>>({});
+  const [fullscreenCameraProgress, setFullscreenCameraProgress] = useState<number | null>(null);
+  const [orientationWarning, setOrientationWarning] = useState(false);
   const editorEnabled = process.env.NODE_ENV === "development";
   const deskObjectRefs = useRef<Record<string, Group | null>>({});
   const cubeObjectRefs = useRef<Record<string, Group | null>>({});
@@ -940,6 +957,14 @@ export default function DeskStage() {
 
   const handleEnterFullscreen = useCallback(async () => {
     setSceneExpanded(true);
+    const storyElement = story.current;
+    let initialProgress: number | null = null;
+    if (storyElement) {
+      const distance = Math.max(storyElement.offsetHeight - window.innerHeight, 0);
+      const scroll = Math.max(0, -storyElement.getBoundingClientRect().top);
+      initialProgress = distance > 0 ? Math.min(1, Math.max(0, scroll / distance)) : 0;
+    }
+    setFullscreenCameraProgress(initialProgress);
     if (typeof document !== "undefined") {
       document.body.setAttribute("data-scene-fullscreen", "true");
       window.dispatchEvent(
@@ -989,6 +1014,8 @@ export default function DeskStage() {
 
   const handleExitFullscreen = useCallback(async () => {
     setSceneExpanded(false);
+    setFullscreenCameraProgress(null);
+    setOrientationWarning(false);
     const doc = typeof document !== "undefined" ? (document as ExtendedDocument) : null;
     if (doc) {
       doc.body.removeAttribute("data-scene-fullscreen");
@@ -1029,6 +1056,8 @@ export default function DeskStage() {
       );
       if (!isCurrentlyFullscreen && sceneExpanded) {
         setSceneExpanded(false);
+        setFullscreenCameraProgress(null);
+        setOrientationWarning(false);
         doc?.body.removeAttribute("data-scene-fullscreen");
         window.dispatchEvent(
           new CustomEvent("portfolio:scene-fullscreen", { detail: { active: false } })
@@ -1100,10 +1129,24 @@ export default function DeskStage() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const container = sceneContainer.current;
+    if (!container) return;
+    const canvas = container.querySelector("canvas");
+    if (!canvas) return;
+
+    if (editorOpen || sceneExpanded) {
+      canvas.style.touchAction = "none";
+    } else {
+      canvas.style.touchAction = "pan-y";
+    }
+  }, [editorOpen, sceneExpanded, sceneVisible, modelsReady]);
+
   return (
     <section
       className="w-full bg-surface-container-lowest py-space-xl px-gutter-mobile lg:px-gutter"
       id="desk-stage"
+      data-editing={editorOpen ? "true" : "false"}
     >
       <div className="max-w-[1280px] mx-auto">
         <div className="relative min-h-[300vh]" ref={story}>
@@ -1145,59 +1188,62 @@ export default function DeskStage() {
               />
 
               {sceneVisible && (
-                <Canvas
-                  style={{
-                    touchAction: sceneExpanded || editorOpen ? "none" : "pan-y",
-                  }}
-                  className={sceneExpanded || editorOpen ? "touch-none" : "touch-pan-y"}
-                  dpr={[1, Math.max(1, renderedConfiguration.environment.pixelRatioCap)]}
-                  shadows={renderedConfiguration.environment.shadows}
-                  camera={{
-                    position: renderedConfiguration.cameraStops[0].position,
-                    fov: targetFov,
-                    near: 0.1,
-                    far: 100,
-                  }}
-                  gl={{ antialias: true, alpha: false }}
-                >
-                  <Suspense fallback={null}>
-                    <RoomScene
-                      story={story}
-                      onStep={setView}
-                      onReady={handleModelsReady}
-                      configuration={renderedConfiguration}
-                      targetFov={targetFov}
-                      editorOpen={editorOpen}
-                      selectedObject={selectedObject}
-                      transformMode={transformMode}
-                      transformSpace={transformSpace}
-                      snapEnabled={snapEnabled}
-                      objectRefs={objectRefs}
-                      onObjectRef={registerObject}
-                      onCubeObjectRef={registerCubeObject}
-                      onTransformCommit={commitObjectTransform}
-                      editorEnabled={editorEnabled}
-                      onSelectedObject={setSelectedObject}
-                      animationToken={animationToken}
-                      onInformation={(title, content) => setInteractionInfo({ title, content })}
-                      onFocusObject={handleFocusObject}
-                      onAnimation={handleAnimation}
-                      activeAnimations={activeAnimations}
-                      onEmbeddedAnimationsDiscovered={handleEmbeddedAnimationsDiscovered}
-                      cubeStudioActive={cubeStudioActive}
-                      cubeStudioTargetId={cubeStudioTargetId || (selectedObject !== "room" ? selectedObject : null)}
-                      cubeStudioProgress={cubeStudioProgress}
-                      onCubeStudioProgress={setCubeStudioProgress}
-                      onEnterCubeView={handleEnterCubeView}
-                      editorTab={editorTab}
-                      selectedLightItem={selectedLightItem}
-                      lightTargetMode={lightTargetMode}
-                      onLightPositionCommit={handleLightPositionCommit}
-                      onLightTargetCommit={handleLightTargetCommit}
-                      onLightRotationCommit={handleLightRotationCommit}
-                    />
-                  </Suspense>
-                </Canvas>
+                <div data-canvas-wrapper="true" className="w-full h-full">
+                  <Canvas
+                    style={{
+                      touchAction: sceneExpanded || editorOpen ? "none" : "pan-y",
+                    }}
+                    className={sceneExpanded || editorOpen ? "touch-none" : "touch-pan-y"}
+                    dpr={[1, Math.max(1, renderedConfiguration.environment.pixelRatioCap)]}
+                    shadows={renderedConfiguration.environment.shadows}
+                    camera={{
+                      position: renderedConfiguration.cameraStops[0].position,
+                      fov: targetFov,
+                      near: 0.1,
+                      far: 100,
+                    }}
+                    gl={{ antialias: true, alpha: false }}
+                  >
+                    <Suspense fallback={null}>
+                      <RoomScene
+                        story={story}
+                        onStep={setView}
+                        onReady={handleModelsReady}
+                        configuration={renderedConfiguration}
+                        targetFov={targetFov}
+                        editorOpen={editorOpen}
+                        selectedObject={selectedObject}
+                        transformMode={transformMode}
+                        transformSpace={transformSpace}
+                        snapEnabled={snapEnabled}
+                        objectRefs={objectRefs}
+                        onObjectRef={registerObject}
+                        onCubeObjectRef={registerCubeObject}
+                        onTransformCommit={commitObjectTransform}
+                        editorEnabled={editorEnabled}
+                        onSelectedObject={setSelectedObject}
+                        animationToken={animationToken}
+                        onInformation={(title, content) => setInteractionInfo({ title, content })}
+                        onFocusObject={handleFocusObject}
+                        onAnimation={handleAnimation}
+                        activeAnimations={activeAnimations}
+                        onEmbeddedAnimationsDiscovered={handleEmbeddedAnimationsDiscovered}
+                        cubeStudioActive={cubeStudioActive}
+                        cubeStudioTargetId={cubeStudioTargetId || (selectedObject !== "room" ? selectedObject : null)}
+                        cubeStudioProgress={cubeStudioProgress}
+                        onCubeStudioProgress={setCubeStudioProgress}
+                        onEnterCubeView={handleEnterCubeView}
+                        editorTab={editorTab}
+                        selectedLightItem={selectedLightItem}
+                        lightTargetMode={lightTargetMode}
+                        onLightPositionCommit={handleLightPositionCommit}
+                        onLightTargetCommit={handleLightTargetCommit}
+                        onLightRotationCommit={handleLightRotationCommit}
+                        manualProgress={fullscreenCameraProgress}
+                      />
+                    </Suspense>
+                  </Canvas>
+                </div>
               )}
 
               {/* Studio View Transition Loading Overlay */}
@@ -1236,20 +1282,69 @@ export default function DeskStage() {
                 </button>
               )}
 
-              {/* Exit Fullscreen 3D View Button */}
-              {sceneExpanded && !cubeStudioActive && cubeStudioProgress <= 0.05 && (
-                <button
-                  aria-label="Exit Fullscreen 3D View"
-                  onClick={handleExitFullscreen}
-                  className="fixed top-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-outline-variant bg-surface-container-lowest/95 text-on-surface shadow-[4px_4px_0px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-300 hover:scale-110 hover:border-primary hover:bg-surface-container-high active:scale-95 cursor-pointer"
-                  type="button"
-                  title="Exit Fullscreen 3D View"
-                >
-                  <span className="material-symbols-outlined text-2xl font-bold" aria-hidden="true">close</span>
-                </button>
+              {/* Fullscreen Top Controls Bar (Edit Scene + Exit Fullscreen) */}
+              {sceneExpanded && (
+                <div className="fixed top-3 right-3 sm:top-4 sm:right-4 z-50 flex items-center gap-2">
+                  {editorEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!editorOpen && deviceInfo.isMobilePortrait) {
+                          setOrientationWarning(true);
+                          setTimeout(() => setOrientationWarning(false), 5000);
+                          return;
+                        }
+                        setEditorOpen(!editorOpen);
+                      }}
+                      className="flex h-11 items-center gap-1.5 sm:gap-2 rounded-xl border-2 border-surface-variant bg-surface-container-lowest/95 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs font-bold text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:bg-surface-container-high active:scale-95 cursor-pointer"
+                      title={editorOpen ? "Close Scene Editor" : "Open Scene Editor"}
+                    >
+                      <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">
+                        {editorOpen ? "close" : "tune"}
+                      </span>
+                      <span>{editorOpen ? "Close editor" : "Edit scene"}</span>
+                    </button>
+                  )}
+
+                  {!cubeStudioActive && cubeStudioProgress <= 0.05 && (
+                    <button
+                      aria-label="Exit Fullscreen 3D View"
+                      onClick={handleExitFullscreen}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-outline-variant bg-surface-container-lowest/95 text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:border-primary hover:bg-surface-container-high active:scale-95 cursor-pointer"
+                      type="button"
+                      title="Exit Fullscreen 3D View"
+                    >
+                      <span className="material-symbols-outlined text-2xl font-bold" aria-hidden="true">
+                        close
+                      </span>
+                    </button>
+                  )}
+                </div>
               )}
 
-              {sceneExpanded && deviceInfo.isMobilePortrait && (
+              {/* Orientation Warning Modal in Fullscreen Mode */}
+              {orientationWarning && (
+                <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex max-w-[90vw] sm:max-w-md items-center gap-2 rounded-xl border-2 border-primary bg-surface-container-lowest/95 p-3 text-xs text-on-surface shadow-[4px_4px_0px_#080d22] backdrop-blur-md animate-bounce">
+                  <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
+                    screen_rotation
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-bold text-primary">Horizontal Mode Required</p>
+                    <p className="text-[11px] text-on-surface-variant leading-tight mt-0.5">
+                      Please rotate your phone horizontally to access the 3D scene editor panel.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOrientationWarning(false)}
+                    className="text-on-surface-variant hover:text-on-surface cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-base">close</span>
+                  </button>
+                </div>
+              )}
+
+              {sceneExpanded && deviceInfo.isMobilePortrait && !orientationWarning && (
                 <div className="fixed top-4 left-4 z-40 flex items-center gap-2 rounded-full border-2 border-primary/50 bg-surface-container-lowest/95 px-3.5 py-2 font-label-code-sm text-xs text-on-surface shadow-[4px_4px_0px_#080d22] backdrop-blur-md animate-pulse pointer-events-none whitespace-nowrap">
                   <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">screen_rotation</span>
                   <span>Rotate phone horizontally for wide view</span>
@@ -1333,73 +1428,71 @@ export default function DeskStage() {
                 />
               )}
 
-              {view !== "screen" && (
-                <>
-                  {sceneExpanded ? (
-                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 rounded-2xl bg-surface-container-lowest/95 border-2 border-surface-variant backdrop-blur-md shadow-[4px_4px_0px_#080d22] max-w-[calc(100%-2rem)] overflow-x-auto no-scrollbar">
-                      {controls.map(({ id, label }) => {
-                        const active = id === "reset" ? view === "overview" : view === id;
-                        return (
-                          <button
-                            aria-pressed={active}
-                            className={`rounded-xl border px-3 py-1.5 font-label-code-sm text-xs whitespace-nowrap shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation cursor-pointer ${
-                              active
-                                ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
-                                : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
-                            }`}
-                            key={id}
-                            onClick={() =>
-                              scrollToProgress(
-                                id === "reset"
-                                  ? 0
-                                  : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
-                                    cameraProgress[id],
-                              )
-                            }
-                            type="button"
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="absolute left-3 right-3 top-3 z-20 flex flex-wrap items-center gap-2 sm:left-5 sm:right-5 sm:top-5">
-                      {controls.map(({ id, label }) => {
-                        const active = id === "reset" ? view === "overview" : view === id;
-                        return (
-                          <button
-                            aria-pressed={active}
-                            className={`rounded-lg border-2 px-2.5 py-1.5 sm:px-3 sm:py-2 font-label-code-sm text-xs sm:text-label-code-sm shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation min-h-[38px] sm:min-h-0 cursor-pointer ${
-                              active
-                                ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
-                                : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
-                            }`}
-                            key={id}
-                            onClick={() =>
-                              scrollToProgress(
-                                id === "reset"
-                                  ? 0
-                                  : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
-                                    cameraProgress[id],
-                              )
-                            }
-                            type="button"
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {!sceneExpanded && (
-                    <div className="absolute bottom-3 left-3 z-20 rounded-lg border border-surface-variant bg-surface-container-lowest/90 px-3 py-2 font-label-code-sm text-xs sm:text-label-code-sm text-on-surface-variant backdrop-blur-md sm:bottom-5 sm:left-5">
-                      {deviceInfo.isTouch
-                        ? "Scroll to explore · Tap objects to interact"
-                        : "Scroll to explore · Click objects to interact"}
-                    </div>
-                  )}
-                </>
+              {/* Camera preset controls - available at all times in both normal and fullscreen modes */}
+              {sceneExpanded ? (
+                <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 rounded-2xl bg-surface-container-lowest/95 border-2 border-surface-variant backdrop-blur-md shadow-[4px_4px_0px_#080d22] max-w-[calc(100%-2rem)] overflow-x-auto no-scrollbar">
+                  {controls.map(({ id, label }) => {
+                    const active = id === "reset" ? view === "overview" : view === id;
+                    return (
+                      <button
+                        aria-pressed={active}
+                        className={`rounded-xl border px-3 py-1.5 font-label-code-sm text-xs whitespace-nowrap shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation cursor-pointer ${
+                          active
+                            ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
+                            : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
+                        }`}
+                        key={id}
+                        onClick={() => {
+                          const targetProgress =
+                            id === "reset"
+                              ? 0
+                              : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
+                                cameraProgress[id];
+                          setFullscreenCameraProgress(targetProgress);
+                          setView(id === "reset" ? "overview" : id);
+                        }}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="absolute left-3 right-3 top-3 z-20 flex flex-wrap items-center gap-2 sm:left-5 sm:right-5 sm:top-5">
+                  {controls.map(({ id, label }) => {
+                    const active = id === "reset" ? view === "overview" : view === id;
+                    return (
+                      <button
+                        aria-pressed={active}
+                        className={`rounded-lg border-2 px-2.5 py-1.5 sm:px-3 sm:py-2 font-label-code-sm text-xs sm:text-label-code-sm shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation min-h-[38px] sm:min-h-0 cursor-pointer ${
+                          active
+                            ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
+                            : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
+                        }`}
+                        key={id}
+                        onClick={() =>
+                          scrollToProgress(
+                            id === "reset"
+                              ? 0
+                              : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
+                                cameraProgress[id],
+                          )
+                        }
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {!sceneExpanded && (
+                <div className="absolute bottom-3 left-3 z-20 rounded-lg border border-surface-variant bg-surface-container-lowest/90 px-3 py-2 font-label-code-sm text-xs sm:text-label-code-sm text-on-surface-variant backdrop-blur-md sm:bottom-5 sm:left-5">
+                  {deviceInfo.isTouch
+                    ? "Scroll to explore · Tap objects to interact"
+                    : "Scroll to explore · Click objects to interact"}
+                </div>
               )}
             </div>
 

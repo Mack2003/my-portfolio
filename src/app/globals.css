@@ -123,12 +123,21 @@
 }
 
 /* Allow smooth native vertical page scrolling when touching/swiping over the 3D desk scene on mobile */
-#desk-stage canvas {
+#desk-stage canvas,
+#desk-stage [data-canvas-wrapper],
+#desk-stage [data-canvas-wrapper] > div,
+#desk-stage [data-canvas-wrapper] canvas {
   touch-action: pan-y !important;
 }
 
 body[data-scene-fullscreen="true"] #desk-stage canvas,
-#desk-stage[data-editing="true"] canvas {
+body[data-scene-fullscreen="true"] #desk-stage [data-canvas-wrapper],
+body[data-scene-fullscreen="true"] #desk-stage [data-canvas-wrapper] > div,
+body[data-scene-fullscreen="true"] #desk-stage [data-canvas-wrapper] canvas,
+#desk-stage[data-editing="true"] canvas,
+#desk-stage[data-editing="true"] [data-canvas-wrapper],
+#desk-stage[data-editing="true"] [data-canvas-wrapper] > div,
+#desk-stage[data-editing="true"] [data-canvas-wrapper] canvas {
   touch-action: none !important;
 }
 

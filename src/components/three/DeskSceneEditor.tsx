@@ -1242,43 +1242,21 @@ export function DeskSceneEditor({
           </button>
         </div>
       )}
-      <div className="pointer-events-auto ml-auto flex w-fit gap-1 pr-0">
-        {open && expanded && (
+      {!expanded && (
+        <div className="pointer-events-auto ml-auto flex w-fit gap-1 pr-0">
           <button
-            aria-label="Exit full-screen editor"
-            className={`${buttonClass} flex h-10 w-10 items-center justify-center shadow-[2px_2px_0px_#080d22]`}
-            onClick={() => onExpandedChange(false)}
-            title="Exit full screen"
-            type="button"
-          >
-            <span className="material-symbols-outlined" aria-hidden="true">close</span>
-          </button>
-        )}
-        {open && (
-          <button
-            aria-label={expanded ? "Exit full-screen scene" : "Open full-screen scene"}
+            aria-expanded={open}
             className={`${buttonClass} flex h-10 items-center gap-2 shadow-[2px_2px_0px_#080d22]`}
-            onClick={() => onExpandedChange(!expanded)}
+            onClick={handleEditClick}
             type="button"
           >
             <span className="material-symbols-outlined text-lg" aria-hidden="true">
-              {expanded ? "close_fullscreen" : "open_in_full"}
+              {open ? "close" : "tune"}
             </span>
-            {expanded ? "Exit full screen" : "Full screen"}
+            {open ? "Close scene editor" : "Edit scene"}
           </button>
-        )}
-        <button
-          aria-expanded={open}
-          className={`${buttonClass} flex h-10 items-center gap-2 shadow-[2px_2px_0px_#080d22]`}
-          onClick={handleEditClick}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-lg" aria-hidden="true">
-            {open ? "close" : "tune"}
-          </span>
-          {open ? "Close scene editor" : "Edit scene"}
-        </button>
-      </div>
+        </div>
+      )}
 
       {open && (
         <div

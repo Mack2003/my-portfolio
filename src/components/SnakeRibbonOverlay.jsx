@@ -944,7 +944,7 @@ export default function SnakeRibbonOverlay({
         <div
           className="pointer-events-auto absolute z-40 -translate-x-1/2 -translate-y-full cursor-pointer select-none transition-all duration-300"
           style={{
-            left: `${Math.max(48, Math.min(containerSizeRef.current.w - 48, headPos.x))}px`,
+            left: `${Math.max(48, headPos.x)}px`,
             top: `${Math.max(12, headPos.y - 52)}px`,
           }}
           onPointerDown={onHeadPointerDown}

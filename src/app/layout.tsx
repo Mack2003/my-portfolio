@@ -4,6 +4,7 @@ import "./globals.css";
 import { portfolioData } from "@/data/portfolio";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://it-cracker.vercel.app"),
   title: portfolioData.metadata.title,
   description: portfolioData.metadata.description,
   keywords: portfolioData.metadata.keywords,
