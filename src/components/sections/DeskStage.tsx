@@ -594,6 +594,11 @@ export default function DeskStage() {
   const [modelsReady, setModelsReady] = useState(false);
   const story = useRef<HTMLDivElement>(null);
   const sceneContainer = useRef<HTMLDivElement>(null);
+  const [containerElement, setContainerElement] = useState<HTMLDivElement | null>(null);
+  const setSceneContainer = useCallback((el: HTMLDivElement | null) => {
+    (sceneContainer as { current: HTMLDivElement | null }).current = el;
+    setContainerElement(el);
+  }, []);
   const [sceneVisible, setSceneVisible] = useState(false);
   const [isStageInViewport, setIsStageInViewport] = useState(false);
 
@@ -1244,7 +1249,7 @@ export default function DeskStage() {
                   ? "fixed inset-0 z-[100] h-screen w-screen overflow-hidden bg-surface-container-low"
                   : "relative min-h-0 flex-1 w-full rounded-none sm:rounded-2xl bg-surface-container-low border-y-2 sm:border-2 border-surface-variant shadow-none sm:shadow-[6px_6px_0px_#080d22] overflow-hidden"
               }
-              ref={sceneContainer}
+              ref={setSceneContainer}
               data-expanded={sceneExpanded ? "true" : "false"}
             >
               <DeskSceneSkeleton
@@ -1396,7 +1401,7 @@ export default function DeskStage() {
               )}
 
               {!sceneExpanded && !cubeStudioActive && cubeStudioProgress <= 0.05 && (
-                <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-30 flex flex-col items-end gap-2 pr-16 sm:pr-20">
+                <div className="absolute bottom-3 left-3 sm:left-auto sm:right-4 sm:bottom-4 z-30 flex flex-col items-start sm:items-end gap-2 pr-0 sm:pr-20">
                   {/* Top helper pill matching reference */}
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container/90 border border-surface-variant backdrop-blur-md shadow-[2px_2px_0px_#080d22] text-on-surface font-label-code-sm text-[11px] sm:text-xs">
                     <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
@@ -1468,6 +1473,7 @@ export default function DeskStage() {
 
               {editorEnabled && sceneVisible && modelsReady && (sceneExpanded || (!deviceInfo.isTouch && deviceInfo.mode === "desktop")) && (
                 <DeskSceneEditor
+                  container={containerElement}
                   open={editorOpen && settingsPanelVisible}
                   onOpenChange={(nextOpen) => {
                     if (!nextOpen) {

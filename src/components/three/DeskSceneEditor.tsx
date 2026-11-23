@@ -434,6 +434,7 @@ export function DeskSceneEditor({
   lightTargetMode = "position",
   onLightTargetModeChange,
   isStageVisible = true,
+  container,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -471,7 +472,9 @@ export function DeskSceneEditor({
   lightTargetMode?: "position" | "target";
   onLightTargetModeChange?: (mode: "position" | "target") => void;
   isStageVisible?: boolean;
+  container?: HTMLElement | null;
 }) {
+  void isStageVisible;
   const [localTab, setLocalTab] = useState<EditorTab>("objects");
 
   const tab = tabProp ?? localTab;
@@ -749,9 +752,13 @@ export function DeskSceneEditor({
 
   function movePanelDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (!dragStart.current) return;
+    const newX = dragStart.current.panelX + event.clientX - dragStart.current.x;
+    const newY = dragStart.current.panelY + event.clientY - dragStart.current.y;
+    const maxDragX = typeof window !== "undefined" ? Math.max(0, window.innerWidth - panelWidth - 16) : 500;
+    const maxDragY = typeof window !== "undefined" ? Math.max(0, window.innerHeight - 180) : 500;
     setPanelPosition({
-      x: dragStart.current.panelX + event.clientX - dragStart.current.x,
-      y: dragStart.current.panelY + event.clientY - dragStart.current.y,
+      x: Math.max(-16, Math.min(newX, maxDragX)),
+      y: Math.max(-16, Math.min(newY, maxDragY)),
     });
   }
 
@@ -1201,11 +1208,12 @@ export function DeskSceneEditor({
 
   const editor = (
     <div
-      className="fixed inset-0 z-[80] pointer-events-none font-label-code-sm text-label-code-sm text-on-surface"
+      className="fixed inset-0 z-[120] pointer-events-none font-label-code-sm text-label-code-sm text-on-surface"
     >
       {open && (
         <div
-          className={`pointer-events-auto fixed z-50 left-2 sm:left-4 top-2 sm:top-3 bottom-2 sm:bottom-3 max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-1.5rem)] ${panelClass} flex flex-col shadow-[6px_6px_0px_#080d22] overflow-hidden`}
+          key={expanded ? "expanded" : "docked"}
+          className={`pointer-events-auto fixed z-[130] left-2 sm:left-4 top-2 sm:top-3 bottom-2 sm:bottom-3 max-h-[calc(100vh-1rem)] sm:max-h-[calc(100vh-1.5rem)] ${panelClass} flex flex-col shadow-[6px_6px_0px_#080d22] overflow-hidden`}
           style={{
             width: `min(${panelWidth}px, calc(100vw - 1rem))`,
             transform: `translate(${panelPosition.x}px, ${panelPosition.y}px)`,
@@ -3077,9 +3085,23 @@ export function DeskSceneEditor({
     </div>
   );
 
-  return typeof document === "undefined"
-    ? null
-    : createPortal(
+  const isFullscreenActive =
+    expanded ||
+    (typeof document !== "undefined" &&
+      Boolean(
+        document.fullscreenElement ||
+          (document as { webkitFullscreenElement?: Element }).webkitFullscreenElement,
+      ));
+
+  const portalTarget =
+    isFullscreenActive && container
+      ? container
+      : typeof document !== "undefined"
+        ? document.body
+        : null;
+
+  return portalTarget
+    ? createPortal(
       <>
         {editor}
         {toast && (
@@ -3109,8 +3131,9 @@ export function DeskSceneEditor({
           </aside>
         )}
       </>,
-      document.body,
-    );
+      portalTarget,
+    )
+    : null;
 }
 
 function TransformFields({
