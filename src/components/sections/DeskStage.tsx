@@ -174,6 +174,7 @@ function CameraMotion({
   cubeStudioConfig,
   onTransitionProgress,
   manualProgress,
+  isGizmoDragging = false,
 }: {
   story: RefObject<HTMLDivElement | null>;
   onStep: (view: CameraView) => void;
@@ -184,6 +185,7 @@ function CameraMotion({
   cubeStudioConfig?: CubeStudioConfiguration;
   onTransitionProgress?: (progress: number) => void;
   manualProgress?: number | null;
+  isGizmoDragging?: boolean;
 }) {
   const controls = useRef<ComponentRef<typeof OrbitControls>>(null);
   const position = useRef(new Vector3());
@@ -233,6 +235,10 @@ function CameraMotion({
   }, [editing]);
 
   useFrame((state, delta) => {
+    if (isGizmoDragging) {
+      return;
+    }
+
     const element = story.current;
     if (!element) return;
 
@@ -376,11 +382,11 @@ function CameraMotion({
   return editing ? (
     <OrbitControls
       ref={controls}
-      enabled={editing}
+      enabled={editing && !isGizmoDragging}
       enableDamping
-      enableRotate={true}
-      enablePan={!cubeViewActive}
-      enableZoom={true}
+      enableRotate={!isGizmoDragging}
+      enablePan={!cubeViewActive && !isGizmoDragging}
+      enableZoom={!isGizmoDragging}
       dampingFactor={0.08}
       minDistance={cubeViewActive ? 0.5 : 0.8}
       maxDistance={cubeViewActive ? 12 : 25}
@@ -461,6 +467,7 @@ function RoomScene({
 }) {
   const bowRef = useRef<Object3D | null>(null);
   const stringsRef = useRef<Object3D | null>(null);
+  const [isGizmoDragging, setIsGizmoDragging] = useState(false);
   const handleNamedObjectRef = useCallback((name: string, object: Object3D | null) => {
     if (name === "Bow") bowRef.current = object;
     if (name === "strings1") stringsRef.current = object;
@@ -488,6 +495,7 @@ function RoomScene({
         space={transformSpace}
         snapEnabled={snapEnabled}
         onCommit={() => onTransformCommit(selectedObject)}
+        onDraggingChange={setIsGizmoDragging}
       />
       <SceneLightGizmo
         active={editorEnabled && editorOpen && editorTab === "lights" && Boolean(selectedLightItem)}
@@ -499,6 +507,7 @@ function RoomScene({
         onCommitPosition={(newPos) => onLightPositionCommit(selectedLightItem?.id ?? "", newPos)}
         onCommitTarget={(newTarget) => onLightTargetCommit(selectedLightItem?.id ?? "", newTarget)}
         onCommitRotation={(newRot) => onLightRotationCommit(selectedLightItem?.id ?? "", newRot)}
+        onDraggingChange={setIsGizmoDragging}
         inCubeStudio={cubeStudioActive}
         cubeStudioPosition={configuration.cubeStudio?.position ?? [0, 80, 0]}
       />
@@ -512,6 +521,7 @@ function RoomScene({
         cubeStudioConfig={configuration.cubeStudio}
         onTransitionProgress={onCubeStudioProgress}
         manualProgress={manualProgress}
+        isGizmoDragging={isGizmoDragging}
       />
       <SceneInteractionController
         configuration={configuration}

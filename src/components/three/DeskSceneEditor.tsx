@@ -152,6 +152,7 @@ export function SceneTransformGizmo({
   space,
   snapEnabled,
   onCommit,
+  onDraggingChange,
 }: {
   active: boolean;
   object: Group | null;
@@ -159,14 +160,35 @@ export function SceneTransformGizmo({
   space: TransformSpace;
   snapEnabled: boolean;
   onCommit: () => void;
+  onDraggingChange?: (dragging: boolean) => void;
 }) {
+  const transformRef = useRef<{ addEventListener: (t: string, cb: (e: { value: boolean }) => void) => void; removeEventListener: (t: string, cb: (e: { value: boolean }) => void) => void } | null>(null);
+
+  useEffect(() => {
+    const ctrl = transformRef.current;
+    if (!ctrl) return;
+    const handleDragging = (event: { value: boolean }) => {
+      onDraggingChange?.(event.value);
+    };
+    ctrl.addEventListener("dragging-changed", handleDragging);
+    return () => {
+      ctrl.removeEventListener("dragging-changed", handleDragging);
+      onDraggingChange?.(false);
+    };
+  }, [onDraggingChange]);
+
   if (!active || !object) return null;
 
   return (
     <TransformControls
+      ref={transformRef as never}
       object={object}
       mode={mode}
-      onMouseUp={onCommit}
+      onMouseDown={() => onDraggingChange?.(true)}
+      onMouseUp={() => {
+        onDraggingChange?.(false);
+        onCommit();
+      }}
       size={0.8}
       space={space}
       translationSnap={snapEnabled ? 0.1 : undefined}
@@ -222,6 +244,7 @@ export function SceneLightGizmo({
   onCommitPosition,
   onCommitTarget,
   onCommitRotation,
+  onDraggingChange,
   inCubeStudio = false,
   cubeStudioPosition = [0, 80, 0],
 }: {
@@ -234,6 +257,7 @@ export function SceneLightGizmo({
   onCommitPosition?: (newPosition: VectorTuple) => void;
   onCommitTarget?: (newTarget: VectorTuple) => void;
   onCommitRotation?: (newRotation: VectorTuple) => void;
+  onDraggingChange?: (dragging: boolean) => void;
   inCubeStudio?: boolean;
   cubeStudioPosition?: VectorTuple;
 }) {
@@ -241,6 +265,21 @@ export function SceneLightGizmo({
   const posGroupRef = useRef<Group | null>(null);
   const targetGroupRef = useRef<Group | null>(null);
   const isDragging = useRef(false);
+  const transformRef = useRef<{ addEventListener: (t: string, cb: (e: { value: boolean }) => void) => void; removeEventListener: (t: string, cb: (e: { value: boolean }) => void) => void } | null>(null);
+
+  useEffect(() => {
+    const ctrl = transformRef.current;
+    if (!ctrl) return;
+    const handleDragging = (event: { value: boolean }) => {
+      isDragging.current = event.value;
+      onDraggingChange?.(event.value);
+    };
+    ctrl.addEventListener("dragging-changed", handleDragging);
+    return () => {
+      ctrl.removeEventListener("dragging-changed", handleDragging);
+      onDraggingChange?.(false);
+    };
+  }, [onDraggingChange]);
 
   const hasPosition = Boolean(light && "position" in light);
   const hasTarget = Boolean(light && "target" in light);
@@ -374,10 +413,12 @@ export function SceneLightGizmo({
       {/* TransformControls: 3D Indicator Arrows attached to selected target (Position or Direction Target) */}
       {anchorNode && (
         <TransformControls
+          ref={transformRef as never}
           mode={light.type === "rectArea" ? mode : "translate"}
           object={anchorNode}
           onMouseDown={() => {
             isDragging.current = true;
+            onDraggingChange?.(true);
           }}
           onObjectChange={() => {
             if (lightTargetMode === "target" && targetGroupRef.current) {
@@ -388,7 +429,10 @@ export function SceneLightGizmo({
               setDragPos([p.x, p.y, p.z]);
             }
           }}
-          onMouseUp={handleCommit}
+          onMouseUp={() => {
+            onDraggingChange?.(false);
+            handleCommit();
+          }}
           rotationSnap={snapEnabled ? Math.PI / 12 : undefined}
           size={0.75}
           space={space}
