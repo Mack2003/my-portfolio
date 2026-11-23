@@ -1411,7 +1411,7 @@ export default function DeskStage() {
               )}
 
               {!sceneExpanded && !cubeStudioActive && cubeStudioProgress <= 0.05 && (
-                <div className="absolute bottom-3 left-3 sm:left-auto sm:right-4 sm:bottom-4 z-30 flex flex-col items-start sm:items-end gap-2 pr-0 sm:pr-20">
+                <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 z-30 flex flex-col items-start gap-2">
                   {/* Top helper pill matching reference */}
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container/90 border border-surface-variant backdrop-blur-md shadow-[2px_2px_0px_#080d22] text-on-surface font-label-code-sm text-[11px] sm:text-xs">
                     <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
@@ -1433,7 +1433,7 @@ export default function DeskStage() {
                           setEditorOpen(next);
                           if (next) setSettingsPanelVisible(true);
                         }}
-                        className={`flex h-10 sm:h-11 items-center gap-2 rounded-xl border-2 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs sm:text-sm font-bold shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+                        className={`hidden md:flex h-10 sm:h-11 items-center gap-2 rounded-xl border-2 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs sm:text-sm font-bold shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
                           editorOpen
                             ? "border-primary bg-primary text-on-primary"
                             : "border-surface-variant bg-surface-container-high/95 text-on-surface hover:bg-surface-container-highest"
@@ -1637,13 +1637,13 @@ export default function DeskStage() {
                   </div>
                 )
               ) : (
-                <div className="absolute left-2 right-2 top-2 z-20 flex flex-wrap items-center gap-1.5 sm:left-5 sm:right-5 sm:top-5 sm:gap-2">
+                <div className="absolute left-3 top-3 sm:left-4 sm:top-4 z-20 flex max-w-[calc(100%-1.5rem)] sm:max-w-max items-center gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-surface-container-lowest/95 border-2 border-surface-variant backdrop-blur-md shadow-[3px_3px_0px_#080d22] overflow-x-auto no-scrollbar">
                   {controls.map(({ id, label }) => {
                     const active = id === "reset" ? view === "overview" : view === id;
                     return (
                       <button
                         aria-pressed={active}
-                        className={`rounded-lg border px-2 py-1 sm:px-3 sm:py-2 font-label-code-sm text-[11px] sm:text-xs shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation min-h-[32px] sm:min-h-0 cursor-pointer ${
+                        className={`rounded-lg sm:rounded-xl border px-2.5 py-1 sm:px-3 sm:py-1.5 font-label-code-sm text-[11px] sm:text-xs whitespace-nowrap shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation cursor-pointer ${
                           active
                             ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
                             : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
