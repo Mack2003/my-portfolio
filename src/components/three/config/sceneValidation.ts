@@ -335,6 +335,14 @@ function validateInteractions(value: unknown, issues: string[], label: string): 
           valid = false;
         }
         break;
+      case "toggleViolinMusic":
+        if (
+          (action.id !== undefined && !isNonEmptyString(action.id)) ||
+          (action.targetObjectId !== undefined && !isNonEmptyString(action.targetObjectId))
+        ) {
+          valid = false;
+        }
+        break;
       case "customAction":
         if (!isNonEmptyString(action.name)) valid = false;
         break;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { backgroundMusic } from "../../lib/backgroundMusic";
 
 interface ExtendedDocument extends Document {
   webkitFullscreenElement?: Element;
@@ -34,7 +35,12 @@ export default function SoundToggle() {
   const [manuallyDismissed, setManuallyDismissed] = useState(false);
   const overlayActive = !isPreviouslyDismissed && !manuallyDismissed;
   const [overlayRendered, setOverlayRendered] = useState(true);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    return backgroundMusic.subscribe((playing) => {
+      setIsPlaying(playing);
+    });
+  }, []);
 
   const handleDismissOverlay = () => {
     setManuallyDismissed(true);
@@ -46,17 +52,24 @@ export default function SoundToggle() {
     }, 750);
   };
 
+  useEffect(() => {
+    const onDismissEvent = () => {
+      handleDismissOverlay();
+    };
+    window.addEventListener("portfolio:dismiss-audio-overlay", onDismissEvent);
+    return () => {
+      window.removeEventListener("portfolio:dismiss-audio-overlay", onDismissEvent);
+    };
+  }, []);
+
   const handleMusicClick = () => {
     if (overlayActive) {
       handleDismissOverlay();
-      const audio = audioRef.current;
-      if (audio && !isPlaying) {
-        audio.play().catch((err) => {
-          console.warn("Audio autoplay blocked or user interaction required:", err);
-        });
+      if (!isPlaying) {
+        void backgroundMusic.play();
       }
     } else {
-      toggleSound();
+      void backgroundMusic.toggle();
     }
   };
 
@@ -96,38 +109,6 @@ export default function SoundToggle() {
       observer.disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    const audio = new Audio("/audio/3D_scene violin_auto_music.mp3");
-    audio.loop = true;
-    audio.volume = 0.65;
-    audioRef.current = audio;
-
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    audio.addEventListener("play", onPlay);
-    audio.addEventListener("pause", onPause);
-
-    return () => {
-      audio.removeEventListener("play", onPlay);
-      audio.removeEventListener("pause", onPause);
-      audio.pause();
-      audio.currentTime = 0;
-    };
-  }, []);
-
-  const toggleSound = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isPlaying) {
-      audio.pause();
-    } else {
-      audio.play().catch((err) => {
-        console.warn("Audio autoplay blocked or user interaction required:", err);
-      });
-    }
-  };
 
   if (isFullscreen) {
     return null;

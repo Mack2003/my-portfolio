@@ -8,6 +8,7 @@ import type {
   SceneInteractionAction,
   SceneObjectInstance,
 } from "../config/sceneTypes";
+import { backgroundMusic } from "../../../lib/backgroundMusic";
 
 type SceneInteractionControllerProps = {
   configuration: SceneConfiguration;
@@ -176,6 +177,16 @@ export function SceneInteractionController({
                   }),
                 );
               }
+              break;
+            }
+            case "toggleViolinMusic": {
+              await backgroundMusic.toggle();
+              const targetId = action.targetObjectId ?? object.id;
+              onAnimation(targetId, "violin-bow-swing-default", 9999);
+              try {
+                sessionStorage.setItem("malay-audio-overlay-dismissed", "true");
+              } catch {}
+              window.dispatchEvent(new CustomEvent("portfolio:dismiss-audio-overlay"));
               break;
             }
             case "customAction":

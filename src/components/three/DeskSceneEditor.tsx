@@ -141,6 +141,8 @@ function newInteractionAction(type: SceneInteractionAction["type"]): SceneIntera
       return { type, duration: 1.5 };
     case "enterCubeView":
       return { type, duration: 1.5, cameraDistance: 3.8, cameraHeight: 1.2 };
+    case "toggleViolinMusic":
+      return { type, targetObjectId: "violin" };
     case "customAction":
       return { type, name: "" };
   }
@@ -732,6 +734,27 @@ export function DeskSceneEditor({
             <label>Transition duration (s)<input className={inputClass} min={0.2} step={0.1} type="number" value={action.duration ?? 1.5} onChange={(event) => onChange({ ...action, duration: Number(event.target.value) })} /></label>
             <label>Camera distance<input className={inputClass} min={1} step={0.5} type="number" value={action.cameraDistance ?? 3.8} onChange={(event) => onChange({ ...action, cameraDistance: Number(event.target.value) })} /></label>
             <label>Camera height<input className={inputClass} step={0.2} type="number" value={action.cameraHeight ?? 1.2} onChange={(event) => onChange({ ...action, cameraHeight: Number(event.target.value) })} /></label>
+          </div>
+        )}
+        {action.type === "toggleViolinMusic" && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label>
+              Target violin/object ID
+              <input
+                className={inputClass}
+                placeholder="violin"
+                value={action.targetObjectId ?? ""}
+                onChange={(event) =>
+                  onChange({
+                    ...action,
+                    targetObjectId: event.target.value || undefined,
+                  })
+                }
+              />
+            </label>
+            <p className="text-xs text-on-surface-variant flex items-center">
+              Toggles background music and syncs violin bow animation.
+            </p>
           </div>
         )}
         {action.type === "customAction" && (
@@ -2496,6 +2519,7 @@ export function DeskSceneEditor({
                               <option value="showInformation">Show information</option>
                               <option value="focusObject">Focus object</option>
                               <option value="enterCubeView">Enter Cube View</option>
+                              <option value="toggleViolinMusic">Violin music &amp; animation</option>
                               <option value="customAction">Custom action</option>
                             </select>
                             <button

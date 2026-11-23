@@ -31,6 +31,7 @@ export type SceneInteractionAction =
       cameraDistance?: number;
       cameraHeight?: number;
     }
+  | { type: "toggleViolinMusic"; id?: string; targetObjectId?: string }
   | { type: "customAction"; name: string; payload?: Record<string, string | number | boolean> };
 
 export type SceneObjectInteractions = {

@@ -141,9 +141,8 @@
         "trigger": "click",
         "actions": [
           {
-            "type": "showInformation",
-            "title": "Violin",
-            "content": "The violin is one of the interactive objects in Malay's desk."
+            "type": "toggleViolinMusic",
+            "targetObjectId": "violin"
           }
         ]
       },

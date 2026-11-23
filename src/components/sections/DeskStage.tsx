@@ -63,6 +63,7 @@ import {
   type RefObject,
 } from "react";
 import { Box3, Vector3, type Object3D, type Group } from "three";
+import { backgroundMusic } from "../../lib/backgroundMusic";
 
 const defaultCubeStudio: CubeStudioConfiguration = {
   enabled: true,
@@ -83,11 +84,13 @@ function BowPlayingAnimation({
   strings,
   story,
   animationToken,
+  isMusicPlaying,
 }: {
   bow: RefObject<Object3D | null>;
   strings: RefObject<Object3D | null>;
   story: RefObject<HTMLDivElement | null>;
   animationToken: number;
+  isMusicPlaying: boolean;
 }) {
   const basePosition = useRef(new Vector3());
   const baseRotation = useRef(new Vector3());
@@ -134,7 +137,7 @@ function BowPlayingAnimation({
       storyRect.bottom > 0 &&
       storyRect.top < window.innerHeight;
 
-    if (reducedMotion || !onScreen) {
+    if (reducedMotion || !onScreen || !isMusicPlaying) {
       bowObject.position.copy(basePosition.current);
       bowObject.rotation.set(
         baseRotation.current.x,
@@ -429,6 +432,7 @@ function RoomScene({
   onLightTargetCommit,
   onLightRotationCommit,
   manualProgress,
+  isMusicPlaying = false,
 }: {
   story: RefObject<HTMLDivElement | null>;
   onStep: (view: CameraView) => void;
@@ -464,6 +468,7 @@ function RoomScene({
   onLightTargetCommit: (id: string, newTarget: VectorTuple) => void;
   onLightRotationCommit: (id: string, newRotation: VectorTuple) => void;
   manualProgress?: number | null;
+  isMusicPlaying?: boolean;
 }) {
   const bowRef = useRef<Object3D | null>(null);
   const stringsRef = useRef<Object3D | null>(null);
@@ -538,6 +543,7 @@ function RoomScene({
         strings={stringsRef}
         story={story}
         animationToken={animationToken}
+        isMusicPlaying={isMusicPlaying}
       />
     </>
   );
@@ -635,6 +641,13 @@ export default function DeskStage() {
   const [activeAnimations, setActiveAnimations] = useState<Record<string, string>>({});
   const [embeddedAnimations, setEmbeddedAnimations] = useState<Record<string, string[]>>({});
   const [fullscreenCameraProgress, setFullscreenCameraProgress] = useState<number | null>(null);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+
+  useEffect(() => {
+    return backgroundMusic.subscribe((playing) => {
+      setIsMusicPlaying(playing);
+    });
+  }, []);
   const editorEnabled = true;
   const deskObjectRefs = useRef<Record<string, Group | null>>({});
   const cubeObjectRefs = useRef<Record<string, Group | null>>({});
@@ -1323,6 +1336,7 @@ export default function DeskStage() {
                         onLightTargetCommit={handleLightTargetCommit}
                         onLightRotationCommit={handleLightRotationCommit}
                         manualProgress={fullscreenCameraProgress}
+                        isMusicPlaying={isMusicPlaying}
                       />
                     </Suspense>
                   </Canvas>
