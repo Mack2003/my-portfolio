@@ -194,6 +194,44 @@ function CameraMotion({
   const currentStep = useRef<CameraView>("overview");
   const transitionRef = useRef({ progress: 0, fromActive: false });
 
+  // Track manual progress changes to animate to preset stops in edit mode
+  const prevManualProgress = useRef<number | null | undefined>(manualProgress);
+  const isAnimatingPreset = useRef(false);
+  const presetStartTime = useRef(0);
+  const wasEditing = useRef(editing);
+
+  useEffect(() => {
+    if (editing && !wasEditing.current) {
+      if (controls.current) {
+        controls.current.target.copy(currentTarget.current);
+        controls.current.update();
+      }
+    }
+    wasEditing.current = editing;
+  }, [editing]);
+
+  useEffect(() => {
+    if (manualProgress !== prevManualProgress.current) {
+      prevManualProgress.current = manualProgress;
+      if (editing && manualProgress !== null && manualProgress !== undefined) {
+        isAnimatingPreset.current = true;
+        presetStartTime.current = performance.now();
+      }
+    }
+  }, [manualProgress, editing]);
+
+  useEffect(() => {
+    const ctrl = controls.current;
+    if (!ctrl) return;
+    const onStart = () => {
+      isAnimatingPreset.current = false;
+    };
+    ctrl.addEventListener("start", onStart);
+    return () => {
+      ctrl.removeEventListener("start", onStart);
+    };
+  }, [editing]);
+
   useFrame((state, delta) => {
     const element = story.current;
     if (!element) return;
@@ -285,6 +323,20 @@ function CameraMotion({
       }
     }
 
+    // In edit mode without preset animation or active transition, release camera to OrbitControls
+    if (editing && t === 0 && !isAnimatingPreset.current) {
+      controls.current?.update();
+      if (controls.current) {
+        currentTarget.current.copy(controls.current.target);
+      }
+      return;
+    }
+
+    if (editing && t === 1 && !isAnimatingPreset.current) {
+      controls.current?.update();
+      return;
+    }
+
     const easing = 1 - Math.exp(-4 * delta);
     activeCamera.position.lerp(position.current, easing);
     if (Math.abs(activeCamera.zoom - deskZoom) > 0.005 && t === 0) {
@@ -295,6 +347,15 @@ function CameraMotion({
       controls.current.target.lerp(target.current, easing);
       controls.current.update();
       currentTarget.current.copy(controls.current.target);
+
+      if (editing && isAnimatingPreset.current) {
+        const distPos = activeCamera.position.distanceTo(position.current);
+        const distTarget = controls.current.target.distanceTo(target.current);
+        const elapsed = performance.now() - presetStartTime.current;
+        if ((distPos < 0.03 && distTarget < 0.03) || elapsed > 800) {
+          isAnimatingPreset.current = false;
+        }
+      }
     } else {
       currentTarget.current.lerp(target.current, easing);
       activeCamera.lookAt(currentTarget.current);
@@ -317,12 +378,12 @@ function CameraMotion({
       ref={controls}
       enabled={editing}
       enableDamping
-      enableRotate={!cubeViewActive}
+      enableRotate={true}
       enablePan={!cubeViewActive}
-      enableZoom
+      enableZoom={true}
       dampingFactor={0.08}
-      minDistance={cubeViewActive ? 0.5 : 1.5}
-      maxDistance={cubeViewActive ? 40 : 20}
+      minDistance={cubeViewActive ? 0.5 : 0.8}
+      maxDistance={cubeViewActive ? 12 : 25}
     />
   ) : null;
 }
@@ -537,6 +598,8 @@ export default function DeskStage() {
   const [isStageInViewport, setIsStageInViewport] = useState(false);
 
   const [editorOpen, setEditorOpen] = useState(false);
+  const [cameraDropdownOpen, setCameraDropdownOpen] = useState(false);
+  const [settingsPanelVisible, setSettingsPanelVisible] = useState(true);
   const [selectedObject, setSelectedObject] = useState<string>("desk");
   const [transformMode, setTransformMode] = useState<TransformMode>("translate");
   const [transformSpace, setTransformSpace] = useState<"world" | "local">("world");
@@ -1014,6 +1077,10 @@ export default function DeskStage() {
   const handleExitFullscreen = useCallback(async () => {
     setSceneExpanded(false);
     setFullscreenCameraProgress(null);
+    setCameraDropdownOpen(false);
+    if (deviceInfo.isTouch || deviceInfo.mode !== "desktop") {
+      setEditorOpen(false);
+    }
     const doc = typeof document !== "undefined" ? (document as ExtendedDocument) : null;
     if (doc) {
       doc.body.removeAttribute("data-scene-fullscreen");
@@ -1044,7 +1111,7 @@ export default function DeskStage() {
         orientationObj.unlock();
       } catch {}
     }
-  }, []);
+  }, [deviceInfo.isTouch, deviceInfo.mode]);
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -1055,6 +1122,10 @@ export default function DeskStage() {
       if (!isCurrentlyFullscreen && sceneExpanded) {
         setSceneExpanded(false);
         setFullscreenCameraProgress(null);
+        setCameraDropdownOpen(false);
+        if (deviceInfo.isTouch || deviceInfo.mode !== "desktop") {
+          setEditorOpen(false);
+        }
         doc?.body.removeAttribute("data-scene-fullscreen");
         window.dispatchEvent(
           new CustomEvent("portfolio:scene-fullscreen", { detail: { active: false } })
@@ -1080,7 +1151,7 @@ export default function DeskStage() {
         document.body.removeAttribute("data-scene-fullscreen");
       }
     };
-  }, [sceneExpanded]);
+  }, [sceneExpanded, deviceInfo.isTouch, deviceInfo.mode]);
 
   const scrollToProgress = useCallback((progress: number) => {
     const element = story.current;
@@ -1285,7 +1356,15 @@ export default function DeskStage() {
                   {editorEnabled && (
                     <button
                       type="button"
-                      onClick={() => setEditorOpen(!editorOpen)}
+                      onClick={() => {
+                        const next = !editorOpen;
+                        setEditorOpen(next);
+                        if (next) {
+                          setSettingsPanelVisible(true);
+                        } else {
+                          setCameraDropdownOpen(false);
+                        }
+                      }}
                       className={`flex h-11 items-center gap-1.5 sm:gap-2 rounded-xl border-2 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs font-bold shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
                         editorOpen
                           ? "border-primary bg-primary text-on-primary"
@@ -1317,15 +1396,55 @@ export default function DeskStage() {
               )}
 
               {!sceneExpanded && !cubeStudioActive && cubeStudioProgress <= 0.05 && (
-                <button
-                  type="button"
-                  onClick={handleEnterFullscreen}
-                  className="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 rounded-xl border-2 border-surface-variant bg-surface-container-lowest/95 px-3 py-2 font-label-code-sm text-xs font-bold text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:bg-surface-container-high active:scale-95 cursor-pointer md:hidden"
-                  title="Expand to Fullscreen View"
-                >
-                  <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">fullscreen</span>
-                  <span>Widescreen ⛶</span>
-                </button>
+                <div className="absolute bottom-3 right-3 sm:bottom-4 sm:right-4 z-30 flex flex-col items-end gap-2 pr-16 sm:pr-20">
+                  {/* Top helper pill matching reference */}
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container/90 border border-surface-variant backdrop-blur-md shadow-[2px_2px_0px_#080d22] text-on-surface font-label-code-sm text-[11px] sm:text-xs">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span>
+                      {deviceInfo.isTouch
+                        ? "Scroll to explore · Tap objects to interact"
+                        : "Scroll to explore · Click objects to interact"}
+                    </span>
+                  </div>
+
+                  {/* Buttons row matching reference */}
+                  <div className="flex items-center gap-2">
+                    {/* On mobile device, edit mode is restricted to fullscreen only. Desktop users can edit in normal or fullscreen mode */}
+                    {editorEnabled && (!deviceInfo.isTouch && deviceInfo.mode === "desktop") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !editorOpen;
+                          setEditorOpen(next);
+                          if (next) setSettingsPanelVisible(true);
+                        }}
+                        className={`flex h-10 sm:h-11 items-center gap-2 rounded-xl border-2 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs sm:text-sm font-bold shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+                          editorOpen
+                            ? "border-primary bg-primary text-on-primary"
+                            : "border-surface-variant bg-surface-container-high/95 text-on-surface hover:bg-surface-container-highest"
+                        }`}
+                        title={editorOpen ? "Close Scene Editor" : "Open Scene Editor"}
+                      >
+                        <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">
+                          {editorOpen ? "close" : "tune"}
+                        </span>
+                        <span>{editorOpen ? "Close editor" : "Edit scene"}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleEnterFullscreen}
+                      className="flex h-10 sm:h-11 items-center gap-2 rounded-xl border-2 border-surface-variant bg-surface-container-high/95 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs sm:text-sm font-bold text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:bg-surface-container-highest active:scale-95 cursor-pointer"
+                      title="Expand to Fullscreen View"
+                    >
+                      <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">
+                        crop_free
+                      </span>
+                      <span>Widescreen</span>
+                    </button>
+                  </div>
+                </div>
               )}
 
               {interactionInfo && (
@@ -1347,10 +1466,17 @@ export default function DeskStage() {
                 </div>
               )}
 
-              {editorEnabled && sceneVisible && modelsReady && (
+              {editorEnabled && sceneVisible && modelsReady && (sceneExpanded || (!deviceInfo.isTouch && deviceInfo.mode === "desktop")) && (
                 <DeskSceneEditor
-                  open={editorOpen}
-                  onOpenChange={setEditorOpen}
+                  open={editorOpen && settingsPanelVisible}
+                  onOpenChange={(nextOpen) => {
+                    if (!nextOpen) {
+                      setSettingsPanelVisible(false);
+                    } else {
+                      setEditorOpen(true);
+                      setSettingsPanelVisible(true);
+                    }
+                  }}
                   selected={selectedObject}
                   onSelectedChange={setSelectedObject}
                   mode={transformMode}
@@ -1392,36 +1518,108 @@ export default function DeskStage() {
                 />
               )}
 
-              {/* Camera preset controls - available at all times in both normal and fullscreen modes */}
+              {/* Camera preset controls - available in normal mode, and in fullscreen (split by non-edit vs edit mode) */}
               {sceneExpanded ? (
-                <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 rounded-2xl bg-surface-container-lowest/95 border-2 border-surface-variant backdrop-blur-md shadow-[4px_4px_0px_#080d22] max-w-[calc(100%-2rem)] overflow-x-auto no-scrollbar">
-                  {controls.map(({ id, label }) => {
-                    const active = id === "reset" ? view === "overview" : view === id;
-                    return (
+                editorOpen ? (
+                  /* Fullscreen Edit Mode Bottom Toolbar: Dropdown + Settings Panel Toggle */
+                  <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 p-1.5 rounded-2xl bg-surface-container-lowest/95 border-2 border-surface-variant backdrop-blur-md shadow-[4px_4px_0px_#080d22]">
+                    {/* Combined camera preset dropdown */}
+                    <div className="relative">
                       <button
-                        aria-pressed={active}
-                        className={`rounded-xl border px-3 py-1.5 font-label-code-sm text-xs whitespace-nowrap shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation cursor-pointer ${
-                          active
-                            ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
-                            : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
-                        }`}
-                        key={id}
-                        onClick={() => {
-                          const targetProgress =
-                            id === "reset"
-                              ? 0
-                              : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
-                                cameraProgress[id];
-                          setFullscreenCameraProgress(targetProgress);
-                          setView(id === "reset" ? "overview" : id);
-                        }}
                         type="button"
+                        aria-expanded={cameraDropdownOpen}
+                        onClick={() => setCameraDropdownOpen((prev) => !prev)}
+                        className="flex h-10 items-center gap-1.5 sm:gap-2 rounded-xl border-2 border-outline-variant bg-surface-container-high/95 px-3 py-1.5 font-label-code-sm text-xs font-bold text-on-surface shadow-[2px_2px_0px_#080d22] transition-colors hover:bg-surface-container-highest active:scale-95 cursor-pointer whitespace-nowrap"
+                        title="Select camera preset position"
                       >
-                        {label}
+                        <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">videocam</span>
+                        <span>{controls.find((c) => (c.id === "reset" ? view === "overview" : view === c.id))?.label ?? "Overview ↺"}</span>
+                        <span className={`material-symbols-outlined text-sm text-on-surface-variant transition-transform duration-200 ${cameraDropdownOpen ? "rotate-180" : ""}`} aria-hidden="true">
+                          expand_more
+                        </span>
                       </button>
-                    );
-                  })}
-                </div>
+
+                      {cameraDropdownOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 flex min-w-[170px] flex-col gap-1 rounded-xl border-2 border-surface-variant bg-surface-container-lowest p-1.5 shadow-[4px_4px_0px_#080d22] z-50">
+                          {controls.map(({ id, label }) => {
+                            const active = id === "reset" ? view === "overview" : view === id;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                className={`flex items-center justify-between rounded-lg px-2.5 py-1.5 text-left font-label-code-sm text-xs transition-colors cursor-pointer ${
+                                  active
+                                    ? "bg-primary-container text-on-primary-container font-bold"
+                                    : "text-on-surface hover:bg-surface-container-high"
+                                }`}
+                                onClick={() => {
+                                  const targetProgress =
+                                    id === "reset"
+                                      ? 0
+                                      : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
+                                        cameraProgress[id];
+                                  setFullscreenCameraProgress(targetProgress);
+                                  setView(id === "reset" ? "overview" : id);
+                                  setCameraDropdownOpen(false);
+                                }}
+                              >
+                                <span>{label}</span>
+                                {active && (
+                                  <span className="material-symbols-outlined text-sm font-bold" aria-hidden="true">check</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Settings Panel Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSettingsPanelVisible((prev) => !prev)}
+                      className={`flex h-10 items-center gap-1.5 sm:gap-2 rounded-xl border-2 px-3 py-1.5 font-label-code-sm text-xs font-bold shadow-[2px_2px_0px_#080d22] transition-colors active:scale-95 cursor-pointer whitespace-nowrap ${
+                        settingsPanelVisible
+                          ? "border-primary bg-primary text-on-primary"
+                          : "border-outline-variant bg-surface-container-high/95 text-on-surface hover:bg-surface-container-highest"
+                      }`}
+                      title={settingsPanelVisible ? "Hide scene settings panel" : "Show scene settings panel"}
+                    >
+                      <span className="material-symbols-outlined text-base" aria-hidden="true">tune</span>
+                      <span>{settingsPanelVisible ? "Hide panel" : "Settings panel"}</span>
+                    </button>
+                  </div>
+                ) : (
+                  /* Fullscreen Non-Edit Mode Bottom Toolbar: Horizontal Pill Bar with 5 Buttons */
+                  <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1.5 p-1.5 rounded-2xl bg-surface-container-lowest/95 border-2 border-surface-variant backdrop-blur-md shadow-[4px_4px_0px_#080d22] max-w-[calc(100%-2rem)] overflow-x-auto no-scrollbar">
+                    {controls.map(({ id, label }) => {
+                      const active = id === "reset" ? view === "overview" : view === id;
+                      return (
+                        <button
+                          aria-pressed={active}
+                          className={`rounded-xl border px-3 py-1.5 font-label-code-sm text-xs whitespace-nowrap shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation cursor-pointer ${
+                            active
+                              ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
+                              : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
+                          }`}
+                          key={id}
+                          onClick={() => {
+                            const targetProgress =
+                              id === "reset"
+                                ? 0
+                                : renderedConfiguration.cameraStops.find((stop) => stop.view === id)?.progress ??
+                                  cameraProgress[id];
+                            setFullscreenCameraProgress(targetProgress);
+                            setView(id === "reset" ? "overview" : id);
+                          }}
+                          type="button"
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
               ) : (
                 <div className="absolute left-2 right-2 top-2 z-20 flex flex-wrap items-center gap-1.5 sm:left-5 sm:right-5 sm:top-5 sm:gap-2">
                   {controls.map(({ id, label }) => {
@@ -1449,13 +1647,6 @@ export default function DeskStage() {
                       </button>
                     );
                   })}
-                </div>
-              )}
-              {!sceneExpanded && (
-                <div className="absolute bottom-2 left-2 z-20 rounded-lg border border-surface-variant bg-surface-container-lowest/90 px-2.5 py-1.5 font-label-code-sm text-[11px] sm:text-label-code-sm text-on-surface-variant backdrop-blur-md sm:bottom-5 sm:left-5 sm:px-3 sm:py-2">
-                  {deviceInfo.isTouch
-                    ? "Scroll to explore · Tap objects to interact"
-                    : "Scroll to explore · Click objects to interact"}
                 </div>
               )}
             </div>
