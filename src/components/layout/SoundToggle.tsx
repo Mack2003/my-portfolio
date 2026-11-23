@@ -2,9 +2,51 @@
 
 import { useEffect, useRef, useState } from "react";
 
+interface ExtendedDocument extends Document {
+  webkitFullscreenElement?: Element;
+}
+
 export default function SoundToggle() {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const checkFullscreenState = () => {
+      const doc = typeof document !== "undefined" ? (document as ExtendedDocument) : null;
+      const isDocFs = Boolean(doc?.fullscreenElement || doc?.webkitFullscreenElement);
+      const isBodyFs =
+        typeof document !== "undefined" &&
+        document.body.getAttribute("data-scene-fullscreen") === "true";
+      setIsFullscreen(isDocFs || isBodyFs);
+    };
+
+    checkFullscreenState();
+
+    const handleCustomFs = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      setIsFullscreen(Boolean(detail?.active));
+    };
+
+    window.addEventListener("portfolio:scene-fullscreen", handleCustomFs);
+    document.addEventListener("fullscreenchange", checkFullscreenState);
+    document.addEventListener("webkitfullscreenchange", checkFullscreenState);
+
+    const observer = new MutationObserver(checkFullscreenState);
+    if (document.body) {
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["data-scene-fullscreen"],
+      });
+    }
+
+    return () => {
+      window.removeEventListener("portfolio:scene-fullscreen", handleCustomFs);
+      document.removeEventListener("fullscreenchange", checkFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", checkFullscreenState);
+      observer.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const audio = new Audio("/audio/3D_scene violin_auto_music.mp3");
@@ -38,8 +80,12 @@ export default function SoundToggle() {
     }
   };
 
+  if (isFullscreen) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-4 right-4 z-40 group">
+    <div data-sound-toggle="true" className="fixed bottom-4 right-4 z-40 group">
       <div className="absolute bottom-full right-0 mb-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-surface-container-highest text-on-surface font-label-code-sm text-xs px-2.5 py-1 rounded-md border border-outline shadow-[2px_2px_0px_#080d22] whitespace-nowrap">
         {isPlaying ? "Music: Playing (Click to mute)" : "Music: Off (Click to play)"}
       </div>

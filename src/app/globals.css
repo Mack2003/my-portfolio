@@ -122,6 +122,35 @@
   animation: none !important;
 }
 
+/* Allow smooth native vertical page scrolling when touching/swiping over the 3D desk scene on mobile */
+#desk-stage canvas {
+  touch-action: pan-y !important;
+}
+
+body[data-scene-fullscreen="true"] #desk-stage canvas,
+#desk-stage[data-editing="true"] canvas {
+  touch-action: none !important;
+}
+
+/* Fullscreen 3D Stage Mode: hide global header, sound toggle, and free up stacking context */
+body[data-scene-fullscreen="true"] header {
+  display: none !important;
+}
+
+body[data-scene-fullscreen="true"] [data-sound-toggle] {
+  display: none !important;
+}
+
+body[data-scene-fullscreen="true"] #desk-stage {
+  position: static !important;
+  z-index: 99999 !important;
+}
+
+body[data-scene-fullscreen="true"] #desk-stage .sticky {
+  position: static !important;
+  height: 100vh !important;
+}
+
 .hero-wave-hand {
   display: inline-block;
   transform-origin: 70% 70%;

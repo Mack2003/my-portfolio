@@ -221,14 +221,14 @@ export function getResponsiveSceneConfiguration(
   mode: ResponsiveDeviceMode,
   orientation: "portrait" | "landscape" = "landscape"
 ): SceneConfiguration {
-  // If desktop landscape, return base configuration unchanged
-  if (mode === "desktop" && orientation === "landscape") {
+  // Whenever the scene is displayed in horizontal/landscape mode (desktop, or mobile in fullscreen landscape),
+  // return the canonical base desktop horizontal configuration so the 3D room, desk, chair, and violin
+  // adopt their natural, wide horizontal layout without squishing or vertical shifting.
+  if (orientation === "landscape") {
     return baseConfig;
   }
 
-  const profile = mode === "mobile" && orientation === "landscape"
-    ? sceneConfig.tablet
-    : sceneConfig[mode] ?? sceneConfig.desktop;
+  const profile = sceneConfig[mode] ?? sceneConfig.desktop;
 
   const overrides = profile.objectOverrides;
 
