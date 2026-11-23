@@ -434,7 +434,6 @@ export function DeskSceneEditor({
   lightTargetMode = "position",
   onLightTargetModeChange,
   isStageVisible = true,
-  isMobilePortrait = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -472,17 +471,10 @@ export function DeskSceneEditor({
   lightTargetMode?: "position" | "target";
   onLightTargetModeChange?: (mode: "position" | "target") => void;
   isStageVisible?: boolean;
-  isMobilePortrait?: boolean;
 }) {
   const [localTab, setLocalTab] = useState<EditorTab>("objects");
-  const [showOrientationWarning, setShowOrientationWarning] = useState(false);
 
   const handleEditClick = () => {
-    if (!open && isMobilePortrait) {
-      setShowOrientationWarning(true);
-      setTimeout(() => setShowOrientationWarning(false), 5000);
-      return;
-    }
     onOpenChange(!open);
   };
   const tab = tabProp ?? localTab;
@@ -1222,26 +1214,6 @@ export function DeskSceneEditor({
             }`
       } font-label-code-sm text-label-code-sm text-on-surface`}
     >
-      {showOrientationWarning && (
-        <div className="pointer-events-auto mb-2 flex max-w-xs items-center gap-2 rounded-xl border-2 border-primary bg-surface-container-lowest/95 p-3 text-xs text-on-surface shadow-[4px_4px_0px_#080d22] backdrop-blur-md animate-bounce">
-          <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
-            screen_rotation
-          </span>
-          <div className="flex-1">
-            <p className="font-bold text-primary">Horizontal Mode Required</p>
-            <p className="text-[11px] text-on-surface-variant leading-tight mt-0.5">
-              Please rotate your phone horizontally to access the 3D scene editor panel.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowOrientationWarning(false)}
-            className="text-on-surface-variant hover:text-on-surface cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-base">close</span>
-          </button>
-        </div>
-      )}
       {!expanded && (
         <div className="pointer-events-auto ml-auto flex w-fit gap-1 pr-0">
           <button
@@ -1262,7 +1234,7 @@ export function DeskSceneEditor({
         <div
           className={`pointer-events-auto fixed z-50 right-2 sm:right-4 ${
             expanded
-              ? "top-3 sm:top-4 bottom-3 sm:bottom-4 max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)]"
+              ? "top-14 sm:top-16 bottom-16 sm:bottom-20 max-h-[calc(100vh-7.5rem)] sm:max-h-[calc(100vh-8.5rem)]"
               : "top-3 sm:top-auto sm:bottom-16 bottom-3 max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-5.5rem)]"
           } ${panelClass} flex flex-col shadow-[6px_6px_0px_#080d22] overflow-hidden`}
           style={{

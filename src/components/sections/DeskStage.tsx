@@ -557,8 +557,7 @@ export default function DeskStage() {
   const [activeAnimations, setActiveAnimations] = useState<Record<string, string>>({});
   const [embeddedAnimations, setEmbeddedAnimations] = useState<Record<string, string[]>>({});
   const [fullscreenCameraProgress, setFullscreenCameraProgress] = useState<number | null>(null);
-  const [orientationWarning, setOrientationWarning] = useState(false);
-  const editorEnabled = process.env.NODE_ENV === "development";
+  const editorEnabled = true;
   const deskObjectRefs = useRef<Record<string, Group | null>>({});
   const cubeObjectRefs = useRef<Record<string, Group | null>>({});
   const objectRefs = cubeStudioActive ? cubeObjectRefs : deskObjectRefs;
@@ -1015,7 +1014,6 @@ export default function DeskStage() {
   const handleExitFullscreen = useCallback(async () => {
     setSceneExpanded(false);
     setFullscreenCameraProgress(null);
-    setOrientationWarning(false);
     const doc = typeof document !== "undefined" ? (document as ExtendedDocument) : null;
     if (doc) {
       doc.body.removeAttribute("data-scene-fullscreen");
@@ -1057,7 +1055,6 @@ export default function DeskStage() {
       if (!isCurrentlyFullscreen && sceneExpanded) {
         setSceneExpanded(false);
         setFullscreenCameraProgress(null);
-        setOrientationWarning(false);
         doc?.body.removeAttribute("data-scene-fullscreen");
         window.dispatchEvent(
           new CustomEvent("portfolio:scene-fullscreen", { detail: { active: false } })
@@ -1144,22 +1141,22 @@ export default function DeskStage() {
 
   return (
     <section
-      className="w-full bg-surface-container-lowest py-space-xl px-gutter-mobile lg:px-gutter"
+      className="w-full bg-surface-container-lowest py-space-xl px-0 sm:px-gutter-mobile lg:px-gutter"
       id="desk-stage"
       data-editing={editorOpen ? "true" : "false"}
     >
       <div className="max-w-[1280px] mx-auto">
         <div className="relative min-h-[300vh]" ref={story}>
           <div className="sticky top-3 flex h-[calc(100vh-1.5rem)] min-h-[520px] flex-col gap-space-sm">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-sm">
+            <div className="px-gutter-mobile sm:px-0 flex flex-col md:flex-row md:items-end justify-between gap-space-sm">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 bg-tertiary rounded-full"></span>
-                  <span className="font-label-code-sm text-label-code-sm text-tertiary uppercase tracking-widest">
+                  <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-tertiary rounded-full"></span>
+                  <span className="font-label-code-sm text-xs sm:text-label-code-sm text-tertiary uppercase tracking-widest font-bold">
                     Scroll-Driven 3D Desk
                   </span>
                 </div>
-                <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface mt-1">
+                <h2 className="font-headline-sm sm:font-headline-md md:font-headline-lg text-lg sm:text-2xl md:text-headline-lg font-bold text-on-surface mt-1 leading-snug">
                   Malay&apos;s Work Desk Simulator
                 </h2>
               </div>
@@ -1174,7 +1171,7 @@ export default function DeskStage() {
               className={
                 sceneExpanded
                   ? "fixed inset-0 z-[100] h-screen w-screen overflow-hidden bg-surface-container-low"
-                  : "relative min-h-0 flex-1 w-full rounded-2xl bg-surface-container-low border-2 border-surface-variant shadow-[6px_6px_0px_#080d22] overflow-hidden"
+                  : "relative min-h-0 flex-1 w-full rounded-none sm:rounded-2xl bg-surface-container-low border-y-2 sm:border-2 border-surface-variant shadow-none sm:shadow-[6px_6px_0px_#080d22] overflow-hidden"
               }
               ref={sceneContainer}
               data-expanded={sceneExpanded ? "true" : "false"}
@@ -1288,18 +1285,15 @@ export default function DeskStage() {
                   {editorEnabled && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!editorOpen && deviceInfo.isMobilePortrait) {
-                          setOrientationWarning(true);
-                          setTimeout(() => setOrientationWarning(false), 5000);
-                          return;
-                        }
-                        setEditorOpen(!editorOpen);
-                      }}
-                      className="flex h-11 items-center gap-1.5 sm:gap-2 rounded-xl border-2 border-surface-variant bg-surface-container-lowest/95 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs font-bold text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:bg-surface-container-high active:scale-95 cursor-pointer"
+                      onClick={() => setEditorOpen(!editorOpen)}
+                      className={`flex h-11 items-center gap-1.5 sm:gap-2 rounded-xl border-2 px-3 sm:px-3.5 py-2 font-label-code-sm text-xs font-bold shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all active:scale-95 cursor-pointer ${
+                        editorOpen
+                          ? "border-primary bg-primary text-on-primary"
+                          : "border-surface-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
+                      }`}
                       title={editorOpen ? "Close Scene Editor" : "Open Scene Editor"}
                     >
-                      <span className="material-symbols-outlined text-lg text-primary" aria-hidden="true">
+                      <span className="material-symbols-outlined text-lg" aria-hidden="true">
                         {editorOpen ? "close" : "tune"}
                       </span>
                       <span>{editorOpen ? "Close editor" : "Edit scene"}</span>
@@ -1322,41 +1316,12 @@ export default function DeskStage() {
                 </div>
               )}
 
-              {/* Orientation Warning Modal in Fullscreen Mode */}
-              {orientationWarning && (
-                <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 flex max-w-[90vw] sm:max-w-md items-center gap-2 rounded-xl border-2 border-primary bg-surface-container-lowest/95 p-3 text-xs text-on-surface shadow-[4px_4px_0px_#080d22] backdrop-blur-md animate-bounce">
-                  <span className="material-symbols-outlined text-xl text-primary" aria-hidden="true">
-                    screen_rotation
-                  </span>
-                  <div className="flex-1">
-                    <p className="font-bold text-primary">Horizontal Mode Required</p>
-                    <p className="text-[11px] text-on-surface-variant leading-tight mt-0.5">
-                      Please rotate your phone horizontally to access the 3D scene editor panel.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOrientationWarning(false)}
-                    className="text-on-surface-variant hover:text-on-surface cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-base">close</span>
-                  </button>
-                </div>
-              )}
-
-              {sceneExpanded && deviceInfo.isMobilePortrait && !orientationWarning && (
-                <div className="fixed top-4 left-4 z-40 flex items-center gap-2 rounded-full border-2 border-primary/50 bg-surface-container-lowest/95 px-3.5 py-2 font-label-code-sm text-xs text-on-surface shadow-[4px_4px_0px_#080d22] backdrop-blur-md animate-pulse pointer-events-none whitespace-nowrap">
-                  <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">screen_rotation</span>
-                  <span>Rotate phone horizontally for wide view</span>
-                </div>
-              )}
-
               {!sceneExpanded && !cubeStudioActive && cubeStudioProgress <= 0.05 && (
                 <button
                   type="button"
                   onClick={handleEnterFullscreen}
-                  className="absolute bottom-3 right-20 sm:right-3 z-30 flex items-center gap-1.5 rounded-xl border-2 border-surface-variant bg-surface-container-lowest/95 px-3 py-2 font-label-code-sm text-xs font-bold text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:bg-surface-container-high active:scale-95 cursor-pointer md:hidden"
-                  title="Expand to Fullscreen Horizontal View"
+                  className="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 rounded-xl border-2 border-surface-variant bg-surface-container-lowest/95 px-3 py-2 font-label-code-sm text-xs font-bold text-on-surface shadow-[3px_3px_0px_#080d22] backdrop-blur-md transition-all hover:bg-surface-container-high active:scale-95 cursor-pointer md:hidden"
+                  title="Expand to Fullscreen View"
                 >
                   <span className="material-symbols-outlined text-base text-primary" aria-hidden="true">fullscreen</span>
                   <span>Widescreen ⛶</span>
@@ -1424,7 +1389,6 @@ export default function DeskStage() {
                   lightTargetMode={lightTargetMode}
                   onLightTargetModeChange={setLightTargetMode}
                   isStageVisible={isStageInViewport}
-                  isMobilePortrait={deviceInfo.isMobilePortrait}
                 />
               )}
 
@@ -1459,13 +1423,13 @@ export default function DeskStage() {
                   })}
                 </div>
               ) : (
-                <div className="absolute left-3 right-3 top-3 z-20 flex flex-wrap items-center gap-2 sm:left-5 sm:right-5 sm:top-5">
+                <div className="absolute left-2 right-2 top-2 z-20 flex flex-wrap items-center gap-1.5 sm:left-5 sm:right-5 sm:top-5 sm:gap-2">
                   {controls.map(({ id, label }) => {
                     const active = id === "reset" ? view === "overview" : view === id;
                     return (
                       <button
                         aria-pressed={active}
-                        className={`rounded-lg border-2 px-2.5 py-1.5 sm:px-3 sm:py-2 font-label-code-sm text-xs sm:text-label-code-sm shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation min-h-[38px] sm:min-h-0 cursor-pointer ${
+                        className={`rounded-lg border px-2 py-1 sm:px-3 sm:py-2 font-label-code-sm text-[11px] sm:text-xs shadow-[2px_2px_0px_#080d22] transition-colors touch-manipulation min-h-[32px] sm:min-h-0 cursor-pointer ${
                           active
                             ? "border-surface-container-lowest bg-primary-container font-bold text-on-primary-container"
                             : "border-outline-variant bg-surface-container-lowest/95 text-on-surface hover:bg-surface-container-high"
@@ -1488,7 +1452,7 @@ export default function DeskStage() {
                 </div>
               )}
               {!sceneExpanded && (
-                <div className="absolute bottom-3 left-3 z-20 rounded-lg border border-surface-variant bg-surface-container-lowest/90 px-3 py-2 font-label-code-sm text-xs sm:text-label-code-sm text-on-surface-variant backdrop-blur-md sm:bottom-5 sm:left-5">
+                <div className="absolute bottom-2 left-2 z-20 rounded-lg border border-surface-variant bg-surface-container-lowest/90 px-2.5 py-1.5 font-label-code-sm text-[11px] sm:text-label-code-sm text-on-surface-variant backdrop-blur-md sm:bottom-5 sm:left-5 sm:px-3 sm:py-2">
                   {deviceInfo.isTouch
                     ? "Scroll to explore · Tap objects to interact"
                     : "Scroll to explore · Click objects to interact"}
@@ -1496,14 +1460,15 @@ export default function DeskStage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between gap-space-sm pb-1">
-              <span className="font-label-code-sm text-label-code-sm text-on-surface-variant">
+            <div className="px-gutter-mobile sm:px-0 flex items-center justify-between gap-space-sm pb-1">
+              <span className="font-label-code-sm text-xs sm:text-label-code-sm text-on-surface-variant">
                 {view === "overview" && "A quiet corner, ready for a closer look."}
+                {view === "wall" && "Wall showcase with technical milestones & logos."}
                 {view === "violin" && "Exploring the creative studio workspace."}
                 {view === "laptop" && "Moving in toward the laptop."}
                 {view === "screen" && "A closer look at the laptop screen."}
               </span>
-              <span className="font-label-code-sm text-label-code-sm text-tertiary">
+              <span className="font-label-code-sm text-xs sm:text-label-code-sm text-tertiary">
                 {Math.round(
                   (renderedConfiguration.cameraStops.find((stop) => stop.view === view)?.progress ??
                     cameraProgress[view]) * 100
